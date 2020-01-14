@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -78,6 +79,7 @@ func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, s
 }
 
 func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) error {
+	limit := make(chan bool, runtime.NumCPU())
 	errs := make(chan error)
 	var wg sync.WaitGroup
 	for _, infile := range infiles {
@@ -85,6 +87,8 @@ func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) error {
 			wg.Add(1)
 			go func(infile string, phase int) {
 				defer wg.Done()
+				limit <- true
+				defer func() { <-limit }()
 				log.Printf("%s phase %d starting", infile, phase+1)
 				defer log.Printf("%s phase %d done", infile, phase+1)
 				tseq, err := cmd.tileGVCF(tilelib, infile, phase)
