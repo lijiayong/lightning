@@ -141,12 +141,16 @@ func (cmd *gvcf2numpy) printVariants(label string, path []tileLibRef) {
 
 func (cmd *gvcf2numpy) tileGVCF(tilelib *tileLibrary, infile string, phase int) (tileseq tileSeq, err error) {
 	args := []string{"bcftools", "consensus", "--fasta-ref", cmd.refFile, "-H", fmt.Sprint(phase + 1), infile}
+	indexsuffix := ".tbi"
+	if _, err := os.Stat(infile + ".csi"); err == nil {
+		indexsuffix = ".csi"
+	}
 	if out, err := exec.Command("docker", "image", "ls", "-q", "lightning-runtime").Output(); err == nil && len(out) > 0 {
 		args = append([]string{
 			"docker", "run", "--rm",
 			"--log-driver=none",
 			"--volume=" + infile + ":" + infile + ":ro",
-			"--volume=" + infile + ".csi:" + infile + ".csi:ro",
+			"--volume=" + infile + indexsuffix + ":" + infile + indexsuffix + ":ro",
 			"--volume=" + cmd.refFile + ":" + cmd.refFile + ":ro",
 			"lightning-runtime",
 		}, args...)
