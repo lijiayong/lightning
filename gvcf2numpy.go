@@ -144,6 +144,7 @@ func (cmd *gvcf2numpy) tileGVCF(tilelib *tileLibrary, infile string, phase int) 
 	if out, err := exec.Command("docker", "image", "ls", "-q", "lightning-runtime").Output(); err == nil && len(out) > 0 {
 		args = append([]string{
 			"docker", "run", "--rm",
+			"--log-driver=none",
 			"--volume=" + infile + ":" + infile + ":ro",
 			"--volume=" + infile + ".csi:" + infile + ".csi:ro",
 			"--volume=" + cmd.refFile + ":" + cmd.refFile + ":ro",
