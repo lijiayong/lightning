@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"io"
+	"log"
 	"sync"
 )
 
@@ -21,14 +22,16 @@ type tileLibrary struct {
 	taglib  *tagLibrary
 	variant [][][md5.Size]byte
 	// count [][]int
-	seq map[[md5.Size]byte][]byte
+	// seq map[[md5.Size]byte][]byte
 
 	mtx sync.Mutex
 }
 
-func (tilelib *tileLibrary) TileFasta(rdr io.Reader) (tileSeq, error) {
+func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq, error) {
 	ret := tileSeq{}
-	flush := func(label string, fasta []byte) {
+	var wg sync.WaitGroup
+	flush := func(seqlabel string, fasta []byte) {
+		defer wg.Done()
 		var path []tileLibRef
 		if len(fasta) == 0 {
 			return
@@ -38,26 +41,26 @@ func (tilelib *tileLibrary) TileFasta(rdr io.Reader) (tileSeq, error) {
 		tilelib.taglib.FindAll(fasta, func(id tagID, pos int) {
 			if tilestart >= 0 {
 				path = append(path, tilelib.getRef(tiletagid, fasta[tilestart:pos]))
-				// log.Printf("%q: tile %d is variant %d of tile %d", label, len(path), path[len(path)-1], id)
 			}
 			tilestart = pos
 			tiletagid = id
 		})
 		if tiletagid >= 0 {
 			path = append(path, tilelib.getRef(tiletagid, fasta[tilestart:]))
-			// log.Printf("%q: tile %d is variant %d of tile %d", label, len(path), path[len(path)-1], tiletagid)
 		}
-		ret[label] = path
+		ret[seqlabel] = path
+		log.Printf("%s %s tiled with path len %d", filelabel, seqlabel, len(path))
 	}
 	var fasta []byte
-	var label string
+	var seqlabel string
 	scanner := bufio.NewScanner(rdr)
 	for scanner.Scan() {
 		buf := scanner.Bytes()
 		if len(buf) == 0 || buf[0] == '>' {
-			flush(label, fasta)
+			wg.Add(1)
+			go flush(seqlabel, fasta)
 			fasta = nil
-			label = string(buf[1:])
+			seqlabel = string(buf[1:])
 		} else {
 			fasta = append(fasta, bytes.ToLower(buf)...)
 		}
@@ -65,7 +68,9 @@ func (tilelib *tileLibrary) TileFasta(rdr io.Reader) (tileSeq, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
-	flush(label, fasta)
+	wg.Add(1)
+	go flush(seqlabel, fasta)
+	wg.Wait()
 	return ret, nil
 }
 
@@ -74,11 +79,11 @@ func (tilelib *tileLibrary) TileFasta(rdr io.Reader) (tileSeq, error) {
 func (tilelib *tileLibrary) getRef(tag tagID, seq []byte) tileLibRef {
 	tilelib.mtx.Lock()
 	defer tilelib.mtx.Unlock()
-	if tilelib.seq == nil {
-		tilelib.seq = map[[md5.Size]byte][]byte{}
-	}
-	for len(tilelib.variant) <= int(tag) {
-		tilelib.variant = append(tilelib.variant, nil)
+	// if tilelib.seq == nil {
+	// 	tilelib.seq = map[[md5.Size]byte][]byte{}
+	// }
+	if len(tilelib.variant) <= int(tag) {
+		tilelib.variant = append(tilelib.variant, make([][][md5.Size]byte, int(tag)-len(tilelib.variant)+1)...)
 	}
 	seqhash := md5.Sum(seq)
 	for i, varhash := range tilelib.variant[tag] {
@@ -87,6 +92,6 @@ func (tilelib *tileLibrary) getRef(tag tagID, seq []byte) tileLibRef {
 		}
 	}
 	tilelib.variant[tag] = append(tilelib.variant[tag], seqhash)
-	tilelib.seq[seqhash] = append([]byte(nil), seq...)
+	// tilelib.seq[seqhash] = append([]byte(nil), seq...)
 	return tileLibRef{tag: tag, variant: tileVariantID(len(tilelib.variant[tag]))}
 }

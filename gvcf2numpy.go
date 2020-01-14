@@ -15,6 +15,8 @@ import (
 type gvcf2numpy struct {
 	tagLibraryFile string
 	refFile        string
+	output         io.Writer
+	outputMtx      sync.Mutex
 }
 
 func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -41,6 +43,9 @@ func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, s
 		flags.Usage()
 		return 2
 	}
+	cmd.output = stdout
+
+	log.Printf("tag library %s load starting", cmd.tagLibraryFile)
 	f, err := os.Open(cmd.tagLibraryFile)
 	if err != nil {
 		return 1
@@ -62,6 +67,8 @@ func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, s
 		err = fmt.Errorf("cannot tile: tag library is empty")
 		return 1
 	}
+	log.Printf("tag library %s load done", cmd.tagLibraryFile)
+
 	tilelib := tileLibrary{taglib: &taglib}
 	err = cmd.tileGVCFs(&tilelib, flags.Args())
 	if err != nil {
@@ -78,6 +85,8 @@ func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) error {
 			wg.Add(1)
 			go func(infile string, phase int) {
 				defer wg.Done()
+				log.Printf("%s phase %d starting", infile, phase+1)
+				defer log.Printf("%s phase %d done", infile, phase+1)
 				tseq, err := cmd.tileGVCF(tilelib, infile, phase)
 				if err != nil {
 					select {
@@ -114,11 +123,16 @@ func (cmd *gvcf2numpy) printVariants(label string, path []tileLibRef) {
 		variant[tvar.tag] = tvar.variant
 	}
 
-	excerpt := variant
-	if len(excerpt) > 100 {
-		excerpt = excerpt[:100]
+	{
+		excerpt := variant
+		if len(excerpt) > 100 {
+			excerpt = excerpt[:100]
+		}
+		log.Printf("%q %v\n", label, excerpt)
 	}
-	log.Printf("%s: %v...", label, excerpt)
+	cmd.outputMtx.Lock()
+	defer cmd.outputMtx.Unlock()
+	fmt.Fprintf(cmd.output, "%q %v\n", label, variant)
 }
 
 func (cmd *gvcf2numpy) tileGVCF(tilelib *tileLibrary, infile string, phase int) (tileseq tileSeq, err error) {
@@ -142,7 +156,7 @@ func (cmd *gvcf2numpy) tileGVCF(tilelib *tileLibrary, infile string, phase int) 
 	if err != nil {
 		return
 	}
-	tileseq, err = tilelib.TileFasta(stdout)
+	tileseq, err = tilelib.TileFasta(fmt.Sprintf("%s phase %d", infile, phase+1), stdout)
 	if err != nil {
 		return
 	}
