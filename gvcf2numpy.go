@@ -99,9 +99,7 @@ func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) error {
 					}
 					return
 				}
-				for chr, path := range tseq {
-					cmd.printVariants(fmt.Sprintf("%s chr %s phase %d", infile, chr, phase+1), path)
-				}
+				cmd.printVariants(fmt.Sprintf("%s phase %d", infile, phase+1), tseq)
 			}(infile, phase)
 		}
 	}
@@ -115,16 +113,20 @@ func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) error {
 	return nil
 }
 
-func (cmd *gvcf2numpy) printVariants(label string, path []tileLibRef) {
+func (cmd *gvcf2numpy) printVariants(label string, tseq map[string][]tileLibRef) {
 	maxtag := tagID(-1)
-	for _, tvar := range path {
-		if maxtag < tvar.tag {
-			maxtag = tvar.tag
+	for _, path := range tseq {
+		for _, tvar := range path {
+			if maxtag < tvar.tag {
+				maxtag = tvar.tag
+			}
 		}
 	}
 	variant := make([]tileVariantID, maxtag+1)
-	for _, tvar := range path {
-		variant[tvar.tag] = tvar.variant
+	for _, path := range tseq {
+		for _, tvar := range path {
+			variant[tvar.tag] = tvar.variant
+		}
 	}
 
 	{

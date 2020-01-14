@@ -29,49 +29,50 @@ type tileLibrary struct {
 
 func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq, error) {
 	ret := tileSeq{}
-	var wg sync.WaitGroup
-	flush := func(seqlabel string, fasta []byte) {
-		defer wg.Done()
-		var path []tileLibRef
-		if len(fasta) == 0 {
-			return
+	type jobT struct {
+		label string
+		fasta []byte
+	}
+	todo := make(chan jobT)
+	scanner := bufio.NewScanner(rdr)
+	go func() {
+		defer close(todo)
+		var fasta []byte
+		var seqlabel string
+		for scanner.Scan() {
+			buf := scanner.Bytes()
+			if len(buf) == 0 || buf[0] == '>' {
+				todo <- jobT{seqlabel, fasta}
+				seqlabel, fasta = string(buf[1:]), nil
+				log.Printf("%s %s reading fasta", filelabel, seqlabel)
+			} else {
+				fasta = append(fasta, bytes.ToLower(buf)...)
+			}
 		}
+		todo <- jobT{seqlabel, fasta}
+	}()
+	for job := range todo {
+		if len(job.fasta) == 0 {
+			continue
+		}
+		log.Printf("%s %s tiling", filelabel, job.label)
+		var path []tileLibRef
 		tilestart := -1        // position in fasta of tile that ends here
 		tiletagid := tagID(-1) // tag id starting tile that ends here
-		tilelib.taglib.FindAll(fasta, func(id tagID, pos int) {
+		tilelib.taglib.FindAll(job.fasta, func(id tagID, pos int) {
 			if tilestart >= 0 {
-				path = append(path, tilelib.getRef(tiletagid, fasta[tilestart:pos]))
+				path = append(path, tilelib.getRef(tiletagid, job.fasta[tilestart:pos]))
 			}
 			tilestart = pos
 			tiletagid = id
 		})
 		if tiletagid >= 0 {
-			path = append(path, tilelib.getRef(tiletagid, fasta[tilestart:]))
+			path = append(path, tilelib.getRef(tiletagid, job.fasta[tilestart:]))
 		}
-		ret[seqlabel] = path
-		log.Printf("%s %s tiled with path len %d", filelabel, seqlabel, len(path))
+		ret[job.label] = path
+		log.Printf("%s %s tiled with path len %d", filelabel, job.label, len(path))
 	}
-	var fasta []byte
-	var seqlabel string
-	scanner := bufio.NewScanner(rdr)
-	for scanner.Scan() {
-		buf := scanner.Bytes()
-		if len(buf) == 0 || buf[0] == '>' {
-			wg.Add(1)
-			go flush(seqlabel, fasta)
-			fasta = nil
-			seqlabel = string(buf[1:])
-		} else {
-			fasta = append(fasta, bytes.ToLower(buf)...)
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-	wg.Add(1)
-	go flush(seqlabel, fasta)
-	wg.Wait()
-	return ret, nil
+	return ret, scanner.Err()
 }
 
 // Return a tileLibRef for a tile with the given tag and sequence,
