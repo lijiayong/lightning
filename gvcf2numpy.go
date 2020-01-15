@@ -8,7 +8,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -46,6 +48,11 @@ func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, s
 	}
 	cmd.output = stdout
 
+	infiles, err := listVCFFiles(flags.Args())
+	if err != nil {
+		return 1
+	}
+
 	log.Printf("tag library %s load starting", cmd.tagLibraryFile)
 	f, err := os.Open(cmd.tagLibraryFile)
 	if err != nil {
@@ -71,11 +78,48 @@ func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, s
 	log.Printf("tag library %s load done", cmd.tagLibraryFile)
 
 	tilelib := tileLibrary{taglib: &taglib}
-	err = cmd.tileGVCFs(&tilelib, flags.Args())
+	err = cmd.tileGVCFs(&tilelib, infiles)
 	if err != nil {
 		return 1
 	}
 	return 0
+}
+
+func listVCFFiles(paths []string) (files []string, err error) {
+	for _, path := range paths {
+		if fi, err := os.Stat(path); err != nil {
+			return nil, fmt.Errorf("%s: stat failed: %s", path, err)
+		} else if !fi.IsDir() {
+			files = append(files, path)
+			continue
+		}
+		d, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("%s: open failed: %s", path, err)
+		}
+		defer d.Close()
+		names, err := d.Readdirnames(0)
+		if err != nil {
+			return nil, fmt.Errorf("%s: readdir failed: %s", path, err)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			if strings.HasSuffix(name, ".vcf") || strings.HasSuffix(name, ".vcf.gz") {
+				files = append(files, filepath.Join(path, name))
+			}
+		}
+		d.Close()
+	}
+	for _, file := range files {
+		if _, err := os.Stat(file + ".csi"); err == nil {
+			continue
+		} else if _, err = os.Stat(file + ".tbi"); err == nil {
+			continue
+		} else {
+			return nil, fmt.Errorf("%s: cannot read without .tbi or .csi index file", file)
+		}
+	}
+	return
 }
 
 func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) error {
