@@ -3,10 +3,11 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"crypto/md5"
 	"io"
 	"log"
 	"sync"
+
+	"golang.org/x/crypto/blake2b"
 )
 
 type tileVariantID int32 // 1-based
@@ -20,9 +21,9 @@ type tileSeq map[string][]tileLibRef
 
 type tileLibrary struct {
 	taglib  *tagLibrary
-	variant [][][md5.Size]byte
+	variant [][][blake2b.Size]byte
 	// count [][]int
-	// seq map[[md5.Size]byte][]byte
+	// seq map[[blake2b.Size]byte][]byte
 
 	mtx sync.Mutex
 }
@@ -81,12 +82,21 @@ func (tilelib *tileLibrary) getRef(tag tagID, seq []byte) tileLibRef {
 	tilelib.mtx.Lock()
 	defer tilelib.mtx.Unlock()
 	// if tilelib.seq == nil {
-	// 	tilelib.seq = map[[md5.Size]byte][]byte{}
+	// 	tilelib.seq = map[[blake2b.Size]byte][]byte{}
 	// }
 	if len(tilelib.variant) <= int(tag) {
-		tilelib.variant = append(tilelib.variant, make([][][md5.Size]byte, int(tag)-len(tilelib.variant)+1)...)
+		tilelib.variant = append(tilelib.variant, make([][][blake2b.Size]byte, int(tag)-len(tilelib.variant)+1)...)
 	}
-	seqhash := md5.Sum(seq)
+	hash, err := blake2b.New(32, nil)
+	if err != nil {
+		panic(err)
+	}
+	_, err = hash.Write(seq)
+	if err != nil {
+		panic(err)
+	}
+	var seqhash [blake2b.Size]byte
+	copy(seqhash[:], hash.Sum(nil))
 	for i, varhash := range tilelib.variant[tag] {
 		if varhash == seqhash {
 			return tileLibRef{tag: tag, variant: tileVariantID(i + 1)}
