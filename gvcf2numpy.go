@@ -175,12 +175,12 @@ func (cmd *gvcf2numpy) printVariants(tseqs []tileSeq) error {
 			}
 		}
 	}
-	out := make([]int32, len(tseqs)*int(maxtag+1))
+	out := make([]uint16, len(tseqs)*int(maxtag+1))
 	for i := 0; i < len(tseqs)/2; i++ {
 		for phase := 0; phase < 2; phase++ {
 			for _, path := range tseqs[i*2+phase] {
 				for _, tvar := range path {
-					out[2*int(tvar.tag)+phase] = int32(tvar.variant)
+					out[2*int(tvar.tag)+phase] = uint16(tvar.variant)
 				}
 			}
 		}
@@ -191,7 +191,7 @@ func (cmd *gvcf2numpy) printVariants(tseqs []tileSeq) error {
 		return err
 	}
 	npw.Shape = []int{len(tseqs) / 2, 2 * (int(maxtag) + 1)}
-	npw.WriteInt32(out)
+	npw.WriteUint16(out)
 	return w.Flush()
 }
 
