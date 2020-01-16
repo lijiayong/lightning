@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/kshedden/gonpy"
 )
@@ -129,39 +130,47 @@ func listVCFFiles(paths []string) (files []string, err error) {
 }
 
 func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) ([]tileSeq, error) {
-	limit := make(chan bool, runtime.NumCPU())
+	starttime := time.Now()
 	errs := make(chan error, 1)
 	tseqs := make([]tileSeq, len(infiles)*2)
+	todo := make(chan func() error, len(infiles)*2)
 	var wg sync.WaitGroup
 	for i, infile := range infiles {
 		for phase := 0; phase < 2; phase++ {
-			wg.Add(1)
-			go func(i int, infile string, phase int) {
-				defer wg.Done()
-				limit <- true
-				defer func() { <-limit }()
+			i, infile, phase := i, infile, phase
+			todo <- func() (err error) {
 				log.Printf("%s phase %d starting", infile, phase+1)
 				defer log.Printf("%s phase %d done", infile, phase+1)
-				var err error
 				tseqs[i*2+phase], err = cmd.tileGVCF(tilelib, infile, phase)
+				return
+			}
+		}
+	}
+	for i := 0; i < runtime.NumCPU(); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for fn := range todo {
+				if len(errs) > 0 {
+					return
+				}
+				err := fn()
 				if err != nil {
 					select {
 					case errs <- err:
 					default:
 					}
-					return
 				}
-			}(i, infile, phase)
-		}
+				remain := len(todo)
+				ttl := time.Now().Sub(starttime) * time.Duration(remain) / time.Duration(cap(todo)-remain)
+				eta := time.Now().Add(ttl)
+				log.Printf("progress %d/%d, eta %v (%v)", cap(todo)-remain, cap(todo), eta, ttl)
+			}
+		}()
 	}
-	go func() {
-		wg.Wait()
-		close(errs)
-	}()
-	if err := <-errs; err != nil {
-		return nil, err
-	}
-	return tseqs, nil
+	wg.Wait()
+	go close(errs)
+	return tseqs, <-errs
 }
 
 func (cmd *gvcf2numpy) printVariants(tseqs []tileSeq) error {
