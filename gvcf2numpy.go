@@ -130,7 +130,7 @@ func listVCFFiles(paths []string) (files []string, err error) {
 
 func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) ([]tileSeq, error) {
 	limit := make(chan bool, runtime.NumCPU())
-	errs := make(chan error)
+	errs := make(chan error, 1)
 	tseqs := make([]tileSeq, len(infiles)*2)
 	var wg sync.WaitGroup
 	for i, infile := range infiles {
