@@ -86,6 +86,13 @@ func (tilelib *tileLibrary) Len() int {
 // Return a tileLibRef for a tile with the given tag and sequence,
 // adding the sequence to the library if needed.
 func (tilelib *tileLibrary) getRef(tag tagID, seq []byte) tileLibRef {
+	for _, b := range seq {
+		if b != 'a' && b != 'c' && b != 'g' && b != 't' {
+			// return "tile not found" if seq has any
+			// no-calls
+			return tileLibRef{tag: tag}
+		}
+	}
 	tilelib.mtx.Lock()
 	defer tilelib.mtx.Unlock()
 	// if tilelib.seq == nil {
