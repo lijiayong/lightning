@@ -81,6 +81,11 @@ func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, s
 	log.Printf("tag library %s load done", cmd.tagLibraryFile)
 
 	tilelib := tileLibrary{taglib: &taglib}
+	go func() {
+		for range time.Tick(10 * time.Second) {
+			log.Printf("tilelib.Len() == %d", tilelib.Len())
+		}
+	}()
 	tseqs, err := cmd.tileGVCFs(&tilelib, infiles)
 	if err != nil {
 		return 1

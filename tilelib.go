@@ -24,6 +24,7 @@ type tileLibrary struct {
 	variant [][][blake2b.Size]byte
 	// count [][]int
 	// seq map[[blake2b.Size]byte][]byte
+	variants int
 
 	mtx sync.Mutex
 }
@@ -76,6 +77,12 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 	return ret, scanner.Err()
 }
 
+func (tilelib *tileLibrary) Len() int {
+	tilelib.mtx.Lock()
+	defer tilelib.mtx.Unlock()
+	return tilelib.variants
+}
+
 // Return a tileLibRef for a tile with the given tag and sequence,
 // adding the sequence to the library if needed.
 func (tilelib *tileLibrary) getRef(tag tagID, seq []byte) tileLibRef {
@@ -84,8 +91,8 @@ func (tilelib *tileLibrary) getRef(tag tagID, seq []byte) tileLibRef {
 	// if tilelib.seq == nil {
 	// 	tilelib.seq = map[[blake2b.Size]byte][]byte{}
 	// }
-	if len(tilelib.variant) <= int(tag) {
-		tilelib.variant = append(tilelib.variant, make([][][blake2b.Size]byte, int(tag)-len(tilelib.variant)+1)...)
+	if tilelib.variant == nil {
+		tilelib.variant = make([][][blake2b.Size]byte, tilelib.taglib.Len())
 	}
 	hash, err := blake2b.New(32, nil)
 	if err != nil {
@@ -102,6 +109,7 @@ func (tilelib *tileLibrary) getRef(tag tagID, seq []byte) tileLibRef {
 			return tileLibRef{tag: tag, variant: tileVariantID(i + 1)}
 		}
 	}
+	tilelib.variants++
 	tilelib.variant[tag] = append(tilelib.variant[tag], seqhash)
 	// tilelib.seq[seqhash] = append([]byte(nil), seq...)
 	return tileLibRef{tag: tag, variant: tileVariantID(len(tilelib.variant[tag]))}
