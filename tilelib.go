@@ -21,7 +21,7 @@ type tileSeq map[string][]tileLibRef
 
 type tileLibrary struct {
 	taglib  *tagLibrary
-	variant [][][blake2b.Size]byte
+	variant [][][blake2b.Size256]byte
 	// count [][]int
 	// seq map[[blake2b.Size]byte][]byte
 	variants int
@@ -99,18 +99,9 @@ func (tilelib *tileLibrary) getRef(tag tagID, seq []byte) tileLibRef {
 	// 	tilelib.seq = map[[blake2b.Size]byte][]byte{}
 	// }
 	if tilelib.variant == nil {
-		tilelib.variant = make([][][blake2b.Size]byte, tilelib.taglib.Len())
+		tilelib.variant = make([][][blake2b.Size256]byte, tilelib.taglib.Len())
 	}
-	hash, err := blake2b.New(32, nil)
-	if err != nil {
-		panic(err)
-	}
-	_, err = hash.Write(seq)
-	if err != nil {
-		panic(err)
-	}
-	var seqhash [blake2b.Size]byte
-	copy(seqhash[:], hash.Sum(nil))
+	seqhash := blake2b.Sum256(seq)
 	for i, varhash := range tilelib.variant[tag] {
 		if varhash == seqhash {
 			return tileLibRef{tag: tag, variant: tileVariantID(i + 1)}
