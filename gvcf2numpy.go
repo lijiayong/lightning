@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -51,42 +52,21 @@ func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, s
 	}
 	cmd.output = stdout
 
-	infiles, err := listVCFFiles(flags.Args())
+	infiles, err := listInputFiles(flags.Args())
 	if err != nil {
 		return 1
 	}
 
-	log.Printf("tag library %s load starting", cmd.tagLibraryFile)
-	f, err := os.Open(cmd.tagLibraryFile)
+	tilelib, err := cmd.loadTileLibrary()
 	if err != nil {
 		return 1
 	}
-	var rdr io.ReadCloser = f
-	if strings.HasSuffix(cmd.tagLibraryFile, ".gz") {
-		rdr, err = gzip.NewReader(f)
-		if err != nil {
-			err = fmt.Errorf("%s: gzip: %s", cmd.tagLibraryFile, err)
-			return 1
-		}
-	}
-	var taglib tagLibrary
-	err = taglib.Load(rdr)
-	if err != nil {
-		return 1
-	}
-	if taglib.Len() < 1 {
-		err = fmt.Errorf("cannot tile: tag library is empty")
-		return 1
-	}
-	log.Printf("tag library %s load done", cmd.tagLibraryFile)
-
-	tilelib := tileLibrary{taglib: &taglib}
 	go func() {
 		for range time.Tick(10 * time.Second) {
 			log.Printf("tilelib.Len() == %d", tilelib.Len())
 		}
 	}()
-	tseqs, err := cmd.tileGVCFs(&tilelib, infiles)
+	tseqs, err := cmd.tileGVCFs(tilelib, infiles)
 	if err != nil {
 		return 1
 	}
@@ -97,12 +77,58 @@ func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, s
 	return 0
 }
 
-func listVCFFiles(paths []string) (files []string, err error) {
+func (cmd *gvcf2numpy) tileFasta(tilelib *tileLibrary, infile string) (tileSeq, error) {
+	var input io.ReadCloser
+	input, err := os.Open(infile)
+	if err != nil {
+		return nil, err
+	}
+	defer input.Close()
+	if strings.HasSuffix(infile, ".gz") {
+		input, err = gzip.NewReader(input)
+		if err != nil {
+			return nil, err
+		}
+		defer input.Close()
+	}
+	return tilelib.TileFasta(infile, input)
+}
+
+func (cmd *gvcf2numpy) loadTileLibrary() (*tileLibrary, error) {
+	log.Printf("tag library %s load starting", cmd.tagLibraryFile)
+	f, err := os.Open(cmd.tagLibraryFile)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var rdr io.ReadCloser = f
+	if strings.HasSuffix(cmd.tagLibraryFile, ".gz") {
+		rdr, err = gzip.NewReader(f)
+		if err != nil {
+			return nil, fmt.Errorf("%s: gzip: %s", cmd.tagLibraryFile, err)
+		}
+		defer rdr.Close()
+	}
+	var taglib tagLibrary
+	err = taglib.Load(rdr)
+	if err != nil {
+		return nil, err
+	}
+	if taglib.Len() < 1 {
+		return nil, fmt.Errorf("cannot tile: tag library is empty")
+	}
+	log.Printf("tag library %s load done", cmd.tagLibraryFile)
+	return &tileLibrary{taglib: &taglib}, nil
+}
+
+func listInputFiles(paths []string) (files []string, err error) {
 	for _, path := range paths {
 		if fi, err := os.Stat(path); err != nil {
 			return nil, fmt.Errorf("%s: stat failed: %s", path, err)
 		} else if !fi.IsDir() {
-			files = append(files, path)
+			if !strings.HasSuffix(path, ".2.fasta") || strings.HasSuffix(path, ".2.fasta.gz") {
+				files = append(files, path)
+			}
 			continue
 		}
 		d, err := os.Open(path)
@@ -118,12 +144,16 @@ func listVCFFiles(paths []string) (files []string, err error) {
 		for _, name := range names {
 			if strings.HasSuffix(name, ".vcf") || strings.HasSuffix(name, ".vcf.gz") {
 				files = append(files, filepath.Join(path, name))
+			} else if strings.HasSuffix(name, ".1.fasta") || strings.HasSuffix(name, ".1.fasta.gz") {
+				files = append(files, filepath.Join(path, name))
 			}
 		}
 		d.Close()
 	}
 	for _, file := range files {
-		if _, err := os.Stat(file + ".csi"); err == nil {
+		if strings.HasSuffix(file, ".1.fasta") || strings.HasSuffix(file, ".1.fasta.gz") {
+			continue
+		} else if _, err := os.Stat(file + ".csi"); err == nil {
 			continue
 		} else if _, err = os.Stat(file + ".tbi"); err == nil {
 			continue
@@ -141,13 +171,29 @@ func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) ([]tile
 	todo := make(chan func() error, len(infiles)*2)
 	var wg sync.WaitGroup
 	for i, infile := range infiles {
-		for phase := 0; phase < 2; phase++ {
-			i, infile, phase := i, infile, phase
+		if strings.HasSuffix(infile, ".1.fasta") || strings.HasSuffix(infile, ".1.fasta.gz") {
 			todo <- func() (err error) {
-				log.Printf("%s phase %d starting", infile, phase+1)
-				defer log.Printf("%s phase %d done", infile, phase+1)
-				tseqs[i*2+phase], err = cmd.tileGVCF(tilelib, infile, phase)
+				log.Printf("%s starting", infile)
+				defer log.Printf("%s done", infile)
+				tseqs[i*2], err = cmd.tileFasta(tilelib, infile)
 				return
+			}
+			infile2 := regexp.MustCompile(`\.1\.fasta(\.gz)?$`).ReplaceAllString(infile, `.2.fasta$1`)
+			todo <- func() (err error) {
+				log.Printf("%s starting", infile2)
+				defer log.Printf("%s done", infile2)
+				tseqs[i*2+1], err = cmd.tileFasta(tilelib, infile2)
+				return
+			}
+		} else {
+			for phase := 0; phase < 2; phase++ {
+				i, infile, phase := i, infile, phase
+				todo <- func() (err error) {
+					log.Printf("%s phase %d starting", infile, phase+1)
+					defer log.Printf("%s phase %d done", infile, phase+1)
+					tseqs[i*2+phase], err = cmd.tileGVCF(tilelib, infile, phase)
+					return
+				}
 			}
 		}
 	}
@@ -235,6 +281,7 @@ func (cmd *gvcf2numpy) tileGVCF(tilelib *tileLibrary, infile string, phase int) 
 	consensus := exec.Command(args[0], args[1:]...)
 	consensus.Stderr = os.Stderr
 	stdout, err := consensus.StdoutPipe()
+	defer stdout.Close()
 	if err != nil {
 		return
 	}
@@ -242,6 +289,7 @@ func (cmd *gvcf2numpy) tileGVCF(tilelib *tileLibrary, infile string, phase int) 
 	if err != nil {
 		return
 	}
+	defer consensus.Wait()
 	tileseq, err = tilelib.TileFasta(fmt.Sprintf("%s phase %d", infile, phase+1), stdout)
 	if err != nil {
 		return
