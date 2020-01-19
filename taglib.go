@@ -55,6 +55,7 @@ func (taglib *tagLibrary) FindAll(buf []byte, fn func(id tagID, pos int)) {
 			continue
 		} else {
 			fn(taginfo.id, i)
+			i += len(taginfo.tagseq) - 1 // don't try to match overlapping tags
 		}
 	}
 }
