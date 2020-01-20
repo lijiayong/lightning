@@ -39,12 +39,7 @@ func (taglib *tagLibrary) Load(rdr io.Reader) error {
 	return taglib.setTags(seqs)
 }
 
-type tagMatch struct {
-	id  tagID
-	pos int
-}
-
-func (taglib *tagLibrary) FindAll(buf []byte, fn func(id tagID, pos int)) {
+func (taglib *tagLibrary) FindAll(buf []byte, fn func(id tagID, pos, taglen int)) {
 	var key tagmapKey
 	for i := 0; i <= len(buf)-taglib.keylen; i++ {
 		copy(key[:taglib.keylen], buf[i:])
@@ -54,7 +49,7 @@ func (taglib *tagLibrary) FindAll(buf []byte, fn func(id tagID, pos int)) {
 			// key portion matches, but not the entire tag
 			continue
 		} else {
-			fn(taginfo.id, i)
+			fn(taginfo.id, i, len(taginfo.tagseq))
 			i += len(taginfo.tagseq) - 1 // don't try to match overlapping tags
 		}
 	}

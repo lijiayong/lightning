@@ -61,9 +61,9 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 		var path []tileLibRef
 		tilestart := -1        // position in fasta of tile that ends here
 		tiletagid := tagID(-1) // tag id starting tile that ends here
-		tilelib.taglib.FindAll(job.fasta, func(id tagID, pos int) {
+		tilelib.taglib.FindAll(job.fasta, func(id tagID, pos, taglen int) {
 			if tilestart >= 0 {
-				path = append(path, tilelib.getRef(tiletagid, job.fasta[tilestart:pos]))
+				path = append(path, tilelib.getRef(tiletagid, job.fasta[tilestart:pos+taglen]))
 			}
 			tilestart = pos
 			tiletagid = id

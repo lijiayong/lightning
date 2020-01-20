@@ -19,6 +19,12 @@ type taglibSuite struct{}
 
 var _ = check.Suite(&taglibSuite{})
 
+type tagMatch struct {
+	id     tagID
+	pos    int
+	taglen int
+}
+
 func (s *taglibSuite) TestFindAllTinyData(c *check.C) {
 	pr, pw, err := os.Pipe()
 	c.Assert(err, check.IsNil)
@@ -35,10 +41,10 @@ gactctagcagagtggccagccac
 	c.Assert(err, check.IsNil)
 	haystack := []byte(`ggagaactgtgctccgccttcagaccccccccccccccccccccacacatgctagcgcgtcggggtgggggggggggggggggggggggggggactctagcagagtggccagccac`)
 	var matches []tagMatch
-	taglib.FindAll(haystack, func(id tagID, pos int) {
-		matches = append(matches, tagMatch{id, pos})
+	taglib.FindAll(haystack, func(id tagID, pos, taglen int) {
+		matches = append(matches, tagMatch{id, pos, taglen})
 	})
-	c.Check(matches, check.DeepEquals, []tagMatch{{0, 0}, {1, 44}, {2, 92}})
+	c.Check(matches, check.DeepEquals, []tagMatch{{0, 0, 24}, {1, 44, 24}, {2, 92, 24}})
 }
 
 func (s *taglibSuite) TestFindAllRealisticSize(c *check.C) {
@@ -80,10 +86,10 @@ func (s *taglibSuite) TestFindAllRealisticSize(c *check.C) {
 	c.Assert(err, check.IsNil)
 	c.Logf("@%v find tags in input", time.Since(start))
 	var matches []tagMatch
-	taglib.FindAll(haystack, func(id tagID, pos int) {
-		matches = append(matches, tagMatch{id, pos})
+	taglib.FindAll(haystack, func(id tagID, pos, taglen int) {
+		matches = append(matches, tagMatch{id, pos, taglen})
 	})
 	c.Logf("@%v done", time.Since(start))
-	c.Check(matches[0], check.Equals, tagMatch{0, 0})
+	c.Check(matches[0], check.Equals, tagMatch{0, 0, tagsize})
 	c.Check(matches[1].id, check.Equals, tagID(1))
 }
