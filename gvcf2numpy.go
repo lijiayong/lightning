@@ -171,6 +171,7 @@ func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) ([]tile
 	todo := make(chan func() error, len(infiles)*2)
 	var wg sync.WaitGroup
 	for i, infile := range infiles {
+		i, infile := i, infile
 		if strings.HasSuffix(infile, ".1.fasta") || strings.HasSuffix(infile, ".1.fasta.gz") {
 			todo <- func() (err error) {
 				log.Printf("%s starting", infile)
