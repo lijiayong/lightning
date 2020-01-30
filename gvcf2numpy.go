@@ -188,7 +188,7 @@ func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) ([]tile
 			}
 		} else {
 			for phase := 0; phase < 2; phase++ {
-				i, infile, phase := i, infile, phase
+				phase := phase
 				todo <- func() (err error) {
 					log.Printf("%s phase %d starting", infile, phase+1)
 					defer log.Printf("%s phase %d done", infile, phase+1)
