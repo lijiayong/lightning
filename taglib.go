@@ -47,10 +47,10 @@ func (taglib *tagLibrary) FindAll(buf []byte, fn func(id tagID, pos, taglen int)
 		if !isbase[int(base)] {
 			valid = 0
 			continue
-		} else {
-			valid++
 		}
 		key = ((key << 2) | twobit[int(base)]) & taglib.keymask
+		valid++
+
 		if valid < taglib.keylen {
 			continue
 		} else if taginfo, ok := taglib.tagmap[key]; !ok {
