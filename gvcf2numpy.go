@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kshedden/gonpy"
@@ -208,10 +209,12 @@ func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) ([]tile
 		}
 	}
 	go close(todo)
+	running := int64(runtime.NumCPU())
 	for i := 0; i < runtime.NumCPU(); i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer atomic.AddInt64(&running, -1)
 			for fn := range todo {
 				if len(errs) > 0 {
 					return
@@ -223,7 +226,7 @@ func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) ([]tile
 					default:
 					}
 				}
-				remain := len(todo)
+				remain := len(todo) + int(atomic.LoadInt64(&running)) - 1
 				ttl := time.Now().Sub(starttime) * time.Duration(remain) / time.Duration(cap(todo)-remain)
 				eta := time.Now().Add(ttl)
 				log.Printf("progress %d/%d, eta %v (%v)", cap(todo)-remain, cap(todo), eta, ttl)
