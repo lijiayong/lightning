@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,6 +39,7 @@ func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, s
 	flags.SetOutput(stderr)
 	flags.StringVar(&cmd.tagLibraryFile, "tag-library", "", "tag library fasta `file`")
 	flags.StringVar(&cmd.refFile, "ref", "", "reference fasta `file`")
+	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
 		err = nil
@@ -51,6 +54,12 @@ func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, s
 		return 2
 	}
 	cmd.output = stdout
+
+	if *pprof != "" {
+		go func() {
+			log.Println(http.ListenAndServe(*pprof, nil))
+		}()
+	}
 
 	infiles, err := listInputFiles(flags.Args())
 	if err != nil {
