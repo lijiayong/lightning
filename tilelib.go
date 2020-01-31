@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
-type tileVariantID int32 // 1-based
+type tileVariantID uint16 // 1-based
 
 type tileLibRef struct {
 	tag     tagID
@@ -19,6 +19,24 @@ type tileLibRef struct {
 }
 
 type tileSeq map[string][]tileLibRef
+
+func (tseq tileSeq) Variants() []tileVariantID {
+	maxtag := 0
+	for _, refs := range tseq {
+		for _, ref := range refs {
+			if maxtag < int(ref.tag) {
+				maxtag = int(ref.tag)
+			}
+		}
+	}
+	vars := make([]tileVariantID, maxtag+1)
+	for _, refs := range tseq {
+		for _, ref := range refs {
+			vars[int(ref.tag)] = ref.variant
+		}
+	}
+	return vars
+}
 
 type tileLibrary struct {
 	taglib  *tagLibrary

@@ -76,11 +76,11 @@ func (cmd *gvcf2numpy) RunCommand(prog string, args []string, stdin io.Reader, s
 			log.Printf("tilelib.Len() == %d", tilelib.Len())
 		}
 	}()
-	tseqs, err := cmd.tileGVCFs(tilelib, infiles)
+	variants, err := cmd.tileGVCFs(tilelib, infiles)
 	if err != nil {
 		return 1
 	}
-	err = cmd.printVariants(tseqs)
+	err = cmd.printVariants(variants)
 	if err != nil {
 		return 1
 	}
@@ -174,36 +174,39 @@ func listInputFiles(paths []string) (files []string, err error) {
 	return
 }
 
-func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) ([]tileSeq, error) {
+func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) ([][]tileVariantID, error) {
 	starttime := time.Now()
 	errs := make(chan error, 1)
-	tseqs := make([]tileSeq, len(infiles)*2)
+	variants := make([][]tileVariantID, len(infiles)*2)
 	todo := make(chan func() error, len(infiles)*2)
 	var wg sync.WaitGroup
 	for i, infile := range infiles {
 		i, infile := i, infile
 		if strings.HasSuffix(infile, ".1.fasta") || strings.HasSuffix(infile, ".1.fasta.gz") {
-			todo <- func() (err error) {
+			todo <- func() error {
 				log.Printf("%s starting", infile)
 				defer log.Printf("%s done", infile)
-				tseqs[i*2], err = cmd.tileFasta(tilelib, infile)
-				return
+				tseqs, err := cmd.tileFasta(tilelib, infile)
+				variants[i*2] = tseqs.Variants()
+				return err
 			}
 			infile2 := regexp.MustCompile(`\.1\.fasta(\.gz)?$`).ReplaceAllString(infile, `.2.fasta$1`)
-			todo <- func() (err error) {
+			todo <- func() error {
 				log.Printf("%s starting", infile2)
 				defer log.Printf("%s done", infile2)
-				tseqs[i*2+1], err = cmd.tileFasta(tilelib, infile2)
-				return
+				tseqs, err := cmd.tileFasta(tilelib, infile2)
+				variants[i*2+1] = tseqs.Variants()
+				return err
 			}
 		} else {
 			for phase := 0; phase < 2; phase++ {
 				phase := phase
-				todo <- func() (err error) {
+				todo <- func() error {
 					log.Printf("%s phase %d starting", infile, phase+1)
 					defer log.Printf("%s phase %d done", infile, phase+1)
-					tseqs[i*2+phase], err = cmd.tileGVCF(tilelib, infile, phase)
-					return
+					tseqs, err := cmd.tileGVCF(tilelib, infile, phase)
+					variants[i*2+phase] = tseqs.Variants()
+					return err
 				}
 			}
 		}
@@ -235,29 +238,23 @@ func (cmd *gvcf2numpy) tileGVCFs(tilelib *tileLibrary, infiles []string) ([]tile
 	}
 	wg.Wait()
 	go close(errs)
-	return tseqs, <-errs
+	return variants, <-errs
 }
 
-func (cmd *gvcf2numpy) printVariants(tseqs []tileSeq) error {
-	maxtag := tagID(-1)
-	for _, tseq := range tseqs {
-		for _, path := range tseq {
-			for _, tvar := range path {
-				if maxtag < tvar.tag {
-					maxtag = tvar.tag
-				}
-			}
+func (cmd *gvcf2numpy) printVariants(variants [][]tileVariantID) error {
+	maxlen := 0
+	for _, v := range variants {
+		if maxlen < len(v) {
+			maxlen = len(v)
 		}
 	}
-	rows := len(tseqs) / 2
-	cols := 2 * (int(maxtag) + 1)
+	rows := len(variants) / 2
+	cols := maxlen * 2
 	out := make([]uint16, rows*cols)
-	for row := 0; row < len(tseqs)/2; row++ {
+	for row := 0; row < len(variants)/2; row++ {
 		for phase := 0; phase < 2; phase++ {
-			for _, path := range tseqs[row*2+phase] {
-				for _, tvar := range path {
-					out[row*cols+2*int(tvar.tag)+phase] = uint16(tvar.variant)
-				}
+			for tag, variant := range variants[row*2+phase] {
+				out[row*cols+2*int(tag)+phase] = uint16(variant)
 			}
 		}
 	}
