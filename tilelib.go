@@ -53,12 +53,13 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 		}
 		todo <- jobT{seqlabel, fasta}
 	}()
+	path := make([]tileLibRef, 2000000)
 	for job := range todo {
 		if len(job.fasta) == 0 {
 			continue
 		}
 		log.Printf("%s %s tiling", filelabel, job.label)
-		var path []tileLibRef
+		path = path[:0]
 		tilestart := -1        // position in fasta of tile that ends here
 		tiletagid := tagID(-1) // tag id starting tile that ends here
 		tilelib.taglib.FindAll(job.fasta, func(id tagID, pos, taglen int) {
@@ -71,7 +72,9 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 		if tiletagid >= 0 {
 			path = append(path, tilelib.getRef(tiletagid, job.fasta[tilestart:]))
 		}
-		ret[job.label] = path
+		pathcopy := make([]tileLibRef, len(path))
+		copy(pathcopy, path)
+		ret[job.label] = pathcopy
 		log.Printf("%s %s tiled with path len %d", filelabel, job.label, len(path))
 	}
 	return ret, scanner.Err()
