@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"io"
 	"log"
+	"strings"
 	"sync"
 
 	"golang.org/x/crypto/blake2b"
@@ -55,7 +56,7 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 	}()
 	path := make([]tileLibRef, 2000000)
 	for job := range todo {
-		if len(job.fasta) == 0 {
+		if len(job.fasta) == 0 || strings.Contains(job.label, "_") {
 			continue
 		}
 		log.Printf("%s %s tiling", filelabel, job.label)
