@@ -16,7 +16,8 @@ var (
 		"-version":  cmd.Version,
 		"--version": cmd.Version,
 
-		"gvcf2numpy":         &gvcf2numpy{},
+		"import":             &importer{},
+		"export-numpy":       &exportNumpy{},
 		"build-docker-image": &buildDockerImage{},
 	})
 )

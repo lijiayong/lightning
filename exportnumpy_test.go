@@ -8,16 +8,18 @@ import (
 	"gopkg.in/check.v1"
 )
 
-type gvcf2numpySuite struct{}
+type exportSuite struct{}
 
-var _ = check.Suite(&gvcf2numpySuite{})
+var _ = check.Suite(&exportSuite{})
 
-func (s *gvcf2numpySuite) TestFastaToNumpy(c *check.C) {
-	var stdout bytes.Buffer
-	var cmd gvcf2numpy
-	exited := cmd.RunCommand("gvcf2numpy", []string{"-tag-library", "testdata/tags", "-ref", "testdata/ref", "testdata/a.1.fasta"}, &bytes.Buffer{}, &stdout, os.Stderr)
+func (s *exportSuite) TestFastaToNumpy(c *check.C) {
+	var buffer bytes.Buffer
+	exited := (&importer{}).RunCommand("import", []string{"-tag-library", "testdata/tags", "-ref", "testdata/ref", "testdata/a.1.fasta"}, &bytes.Buffer{}, &buffer, os.Stderr)
 	c.Check(exited, check.Equals, 0)
-	npy, err := gonpy.NewReader(&stdout)
+	var output bytes.Buffer
+	exited = (&exportNumpy{}).RunCommand("export-numpy", nil, &buffer, &output, os.Stderr)
+	c.Check(exited, check.Equals, 0)
+	npy, err := gonpy.NewReader(&output)
 	c.Assert(err, check.IsNil)
 	variants, err := npy.GetUint16()
 	c.Assert(err, check.IsNil)
