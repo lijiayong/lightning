@@ -18,6 +18,7 @@ var (
 
 		"import":             &importer{},
 		"export-numpy":       &exportNumpy{},
+		"filter":             &filterer{},
 		"build-docker-image": &buildDockerImage{},
 	})
 )
