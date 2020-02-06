@@ -56,8 +56,12 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 		if ntags < len(cg.Variants)/2 {
 			ntags = len(cg.Variants) / 2
 		}
+		if *maxvariants < 0 {
+			continue
+		}
+		maxVariantID := tileVariantID(*maxVariants)
 		for idx, variant := range cg.Variants {
-			if int(variant) > *maxvariants {
+			if variant > maxVariantID {
 				for _, cg := range cgs {
 					if len(cg.Variants) > idx {
 						cg.Variants[idx & ^1] = 0
