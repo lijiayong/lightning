@@ -59,7 +59,7 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 		if *maxvariants < 0 {
 			continue
 		}
-		maxVariantID := tileVariantID(*maxVariants)
+		maxVariantID := tileVariantID(*maxvariants)
 		for idx, variant := range cg.Variants {
 			if variant > maxVariantID {
 				for _, cg := range cgs {
