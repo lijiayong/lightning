@@ -21,12 +21,16 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"git.arvados.org/arvados.git/sdk/go/arvados"
 )
 
 type importer struct {
 	tagLibraryFile string
 	refFile        string
 	outputFile     string
+	projectUUID    string
+	runLocal       bool
 	encoder        *gob.Encoder
 }
 
@@ -42,6 +46,8 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 	flags.StringVar(&cmd.tagLibraryFile, "tag-library", "", "tag library fasta `file`")
 	flags.StringVar(&cmd.refFile, "ref", "", "reference fasta `file`")
 	flags.StringVar(&cmd.outputFile, "o", "", "output `file`")
+	flags.StringVar(&cmd.projectUUID, "project", "", "project `UUID` for storing intermediate and output data")
+	flags.BoolVar(&cmd.runLocal, "local", false, "run on local host (default: run in an arvados container)")
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
@@ -61,6 +67,40 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 		go func() {
 			log.Println(http.ListenAndServe(*pprof, nil))
 		}()
+	}
+
+	if !cmd.runLocal {
+		runner := arvadosContainerRunner{
+			Name:        "lightning import",
+			Client:      arvados.NewClientFromEnv(),
+			ProjectUUID: cmd.projectUUID,
+		}
+		err = runner.TranslatePaths(&cmd.tagLibraryFile, &cmd.refFile, &cmd.outputFile)
+		if err != nil {
+			return 1
+		}
+		inputs := flags.Args()
+		for i := range inputs {
+			err = runner.TranslatePaths(&inputs[i])
+			if err != nil {
+				return 1
+			}
+		}
+		if cmd.outputFile == "" {
+			cmd.outputFile = "/mnt/output/library.gob"
+		} else {
+			// Not yet implemented, but this should write
+			// the collection to an existing collection,
+			// possibly even an in-place update.
+			err = errors.New("cannot specify output file in container mode: not implemented")
+			return 1
+		}
+		runner.Args = append([]string{"import", "-local=true", "-tag-library", cmd.tagLibraryFile, "-ref", cmd.refFile, "-o", cmd.outputFile}, inputs...)
+		err = runner.Run()
+		if err != nil {
+			return 1
+		}
+		return 0
 	}
 
 	infiles, err := listInputFiles(flags.Args())
