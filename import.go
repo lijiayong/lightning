@@ -26,6 +26,7 @@ import (
 type importer struct {
 	tagLibraryFile string
 	refFile        string
+	outputFile     string
 	encoder        *gob.Encoder
 }
 
@@ -40,6 +41,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 	flags.SetOutput(stderr)
 	flags.StringVar(&cmd.tagLibraryFile, "tag-library", "", "tag library fasta `file`")
 	flags.StringVar(&cmd.refFile, "ref", "", "reference fasta `file`")
+	flags.StringVar(&cmd.outputFile, "o", "", "output `file`")
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
@@ -75,8 +77,21 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 			log.Printf("tilelib.Len() == %d", tilelib.Len())
 		}
 	}()
-	w := bufio.NewWriter(stdout)
+
+	var outfile *os.File
+	var w *bufio.Writer
+	if cmd.outputFile == "" {
+		w = bufio.NewWriter(stdout)
+	} else {
+		outfile, err = os.OpenFile(cmd.outputFile, os.O_CREATE|os.O_WRONLY, 0777)
+		if err != nil {
+			return 1
+		}
+		defer outfile.Close()
+		w = bufio.NewWriter(outfile)
+	}
 	cmd.encoder = gob.NewEncoder(w)
+
 	err = cmd.tileInputs(tilelib, infiles)
 	if err != nil {
 		return 1
@@ -84,6 +99,12 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 	err = w.Flush()
 	if err != nil {
 		return 1
+	}
+	if outfile != nil {
+		err = outfile.Close()
+		if err != nil {
+			return 1
+		}
 	}
 	return 0
 }
