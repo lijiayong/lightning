@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"encoding/gob"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -46,8 +47,8 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 		return 0
 	} else if err != nil {
 		return 2
-	} else if cmd.refFile == "" || cmd.tagLibraryFile == "" {
-		fmt.Fprintln(os.Stderr, "cannot run without -tag-library and -ref arguments")
+	} else if cmd.tagLibraryFile == "" {
+		fmt.Fprintln(os.Stderr, "cannot import without -tag-library argument")
 		return 2
 	} else if flags.NArg() == 0 {
 		flags.Usage()
@@ -76,7 +77,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 	}()
 	w := bufio.NewWriter(stdout)
 	cmd.encoder = gob.NewEncoder(w)
-	err = cmd.tileGVCFs(tilelib, infiles)
+	err = cmd.tileInputs(tilelib, infiles)
 	if err != nil {
 		return 1
 	}
@@ -174,7 +175,7 @@ func listInputFiles(paths []string) (files []string, err error) {
 	return
 }
 
-func (cmd *importer) tileGVCFs(tilelib *tileLibrary, infiles []string) error {
+func (cmd *importer) tileInputs(tilelib *tileLibrary, infiles []string) error {
 	starttime := time.Now()
 	errs := make(chan error, 1)
 	todo := make(chan func() error, len(infiles)*2)
@@ -275,6 +276,10 @@ func (cmd *importer) tileGVCFs(tilelib *tileLibrary, infiles []string) error {
 }
 
 func (cmd *importer) tileGVCF(tilelib *tileLibrary, infile string, phase int) (tileseq tileSeq, err error) {
+	if cmd.refFile == "" {
+		err = errors.New("cannot import vcf: reference data (-ref) not specified")
+		return
+	}
 	args := []string{"bcftools", "consensus", "--fasta-ref", cmd.refFile, "-H", fmt.Sprint(phase + 1), infile}
 	indexsuffix := ".tbi"
 	if _, err := os.Stat(infile + ".csi"); err == nil {
