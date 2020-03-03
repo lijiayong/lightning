@@ -20,6 +20,7 @@ type arvadosContainerRunner struct {
 	ProjectUUID string
 	VCPUs       int
 	RAM         int64
+	Prog        string // if empty, run /proc/self/exe
 	Args        []string
 	Mounts      map[string]string
 }
@@ -32,23 +33,28 @@ func (runner *arvadosContainerRunner) Run() error {
 	if runner.ProjectUUID == "" {
 		return errors.New("cannot run arvados container: ProjectUUID not provided")
 	}
-	prog := "/mnt/cmd/lightning"
-	cmdUUID, err := runner.makeCommandCollection()
-	if err != nil {
-		return err
-	}
-	command := append([]string{prog}, runner.Args...)
 	mounts := map[string]map[string]interface{}{
-		"/mnt/cmd": {
-			"kind": "collection",
-			"uuid": cmdUUID,
-		},
 		"/mnt/output": {
 			"kind":     "tmp",
 			"writable": true,
 			"capacity": 100000000000,
 		},
 	}
+
+	prog := runner.Prog
+	if prog == "" {
+		prog = "/mnt/cmd/lightning"
+		cmdUUID, err := runner.makeCommandCollection()
+		if err != nil {
+			return err
+		}
+		mounts["/mnt/cmd"] = map[string]interface{}{
+			"kind": "collection",
+			"uuid": cmdUUID,
+		}
+	}
+	command := append([]string{prog}, runner.Args...)
+
 	for uuid, mnt := range runner.Mounts {
 		mounts[mnt] = map[string]interface{}{
 			"kind": "collection",
@@ -61,7 +67,7 @@ func (runner *arvadosContainerRunner) Run() error {
 		KeepCacheRAM: (1 << 26) * 2 * int64(runner.VCPUs),
 	}
 	var cr arvados.ContainerRequest
-	err = runner.Client.RequestAndDecode(&cr, "POST", "arvados/v1/container_requests", nil, map[string]interface{}{
+	err := runner.Client.RequestAndDecode(&cr, "POST", "arvados/v1/container_requests", nil, map[string]interface{}{
 		"container_request": map[string]interface{}{
 			"owner_uuid":          runner.ProjectUUID,
 			"name":                runner.Name,

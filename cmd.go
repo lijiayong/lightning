@@ -20,6 +20,7 @@ var (
 		"export-numpy":       &exportNumpy{},
 		"filter":             &filterer{},
 		"build-docker-image": &buildDockerImage{},
+		"pca":                &pythonPCA{},
 	})
 )
 
@@ -37,19 +38,23 @@ func (cmd *buildDockerImage) RunCommand(prog string, args []string, stdin io.Rea
 	}
 	defer os.RemoveAll(tmpdir)
 	err = ioutil.WriteFile(tmpdir+"/Dockerfile", []byte(`FROM debian:10
-RUN apt-get update
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bcftools samtools
+RUN DEBIAN_FRONTEND=noninteractive \
+  apt-get update && \
+  apt-get dist-upgrade -y && \
+  apt-get install -y --no-install-recommends bcftools samtools python3-sklearn && \
+  apt-get clean
 `), 0644)
 	if err != nil {
 		fmt.Fprint(stderr, err)
 		return 1
 	}
 	docker := exec.Command("docker", "build", "--tag=lightning-runtime", tmpdir)
-	docker.Stdout = os.Stdout
-	docker.Stderr = os.Stderr
+	docker.Stdout = stdout
+	docker.Stderr = stderr
 	err = docker.Run()
 	if err != nil {
 		return 1
 	}
+	fmt.Fprintf(stderr, "built and tagged new docker image, lightning-runtime\n")
 	return 0
 }

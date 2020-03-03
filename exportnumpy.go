@@ -15,9 +15,7 @@ import (
 	"github.com/kshedden/gonpy"
 )
 
-type exportNumpy struct {
-	output io.Writer
-}
+type exportNumpy struct{}
 
 func (cmd *exportNumpy) RunCommand(prog string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var err error
@@ -40,7 +38,6 @@ func (cmd *exportNumpy) RunCommand(prog string, args []string, stdin io.Reader, 
 	} else if err != nil {
 		return 2
 	}
-	cmd.output = stdout
 
 	if *pprof != "" {
 		go func() {
@@ -92,7 +89,7 @@ func (cmd *exportNumpy) RunCommand(prog string, args []string, stdin io.Reader, 
 
 	var output io.WriteCloser
 	if *outputFilename == "" {
-		output = nopCloser{cmd.output}
+		output = nopCloser{stdout}
 	} else {
 		output, err = os.OpenFile(*outputFilename, os.O_CREATE|os.O_WRONLY, 0777)
 		if err != nil {
