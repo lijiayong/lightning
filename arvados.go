@@ -18,6 +18,8 @@ type arvadosContainerRunner struct {
 	Client      *arvados.Client
 	Name        string
 	ProjectUUID string
+	VCPUs       int
+	RAM         int64
 	Args        []string
 	Mounts      map[string]string
 }
@@ -53,11 +55,10 @@ func (runner *arvadosContainerRunner) Run() error {
 			"uuid": uuid,
 		}
 	}
-	cpus := 16
 	rc := arvados.RuntimeConstraints{
-		VCPUs:        cpus,
-		RAM:          64000000000,
-		KeepCacheRAM: (1 << 26) * 2 * int64(cpus),
+		VCPUs:        runner.VCPUs,
+		RAM:          runner.RAM,
+		KeepCacheRAM: (1 << 26) * 2 * int64(runner.VCPUs),
 	}
 	var cr arvados.ContainerRequest
 	err = runner.Client.RequestAndDecode(&cr, "POST", "arvados/v1/container_requests", nil, map[string]interface{}{
@@ -113,8 +114,8 @@ func (runner *arvadosContainerRunner) makeCommandCollection() (string, error) {
 		Limit: 1,
 		Count: "none",
 		Filters: []arvados.Filter{
-			{"name", "=", cname},
-			{"owner_uuid", "=", runner.ProjectUUID},
+			{Attr: "name", Operator: "=", Operand: cname},
+			{Attr: "owner_uuid", Operator: "=", Operand: runner.ProjectUUID},
 		},
 	})
 	if err != nil {

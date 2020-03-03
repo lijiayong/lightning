@@ -17,7 +17,7 @@ func (s *exportSuite) TestFastaToNumpy(c *check.C) {
 	exited := (&importer{}).RunCommand("import", []string{"-local=true", "-tag-library", "testdata/tags", "-ref", "testdata/ref", "testdata/a.1.fasta"}, &bytes.Buffer{}, &buffer, os.Stderr)
 	c.Assert(exited, check.Equals, 0)
 	var output bytes.Buffer
-	exited = (&exportNumpy{}).RunCommand("export-numpy", nil, &buffer, &output, os.Stderr)
+	exited = (&exportNumpy{}).RunCommand("export-numpy", []string{"-local=true"}, &buffer, &output, os.Stderr)
 	c.Check(exited, check.Equals, 0)
 	npy, err := gonpy.NewReader(&output)
 	c.Assert(err, check.IsNil)

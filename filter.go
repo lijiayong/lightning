@@ -3,12 +3,17 @@ package main
 import (
 	"bufio"
 	"encoding/gob"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+
+	"git.arvados.org/arvados.git/sdk/go/arvados"
 )
 
 type filterer struct {
@@ -25,6 +30,10 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 	flags := flag.NewFlagSet("", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
+	runlocal := flags.Bool("local", false, "run on local host (default: run in an arvados container)")
+	projectUUID := flags.String("project", "", "project `UUID` for output data")
+	inputFilename := flags.String("i", "", "input `file`")
+	outputFilename := flags.String("o", "", "output `file`")
 	maxvariants := flags.Int("max-variants", -1, "drop tiles with more than `N` variants")
 	mincoverage := flags.Float64("min-coverage", 1, "drop tiles with coverage less than `P` across all haplotypes (0 < P ≤ 1)")
 	maxtag := flags.Int("max-tag", -1, "drop tiles with tag ID > `N`")
@@ -43,8 +52,52 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 		}()
 	}
 
+	if !*runlocal {
+		if *outputFilename != "" {
+			err = errors.New("cannot specify output file in container mode: not implemented")
+			return 1
+		}
+		runner := arvadosContainerRunner{
+			Name:        "lightning filter",
+			Client:      arvados.NewClientFromEnv(),
+			ProjectUUID: *projectUUID,
+			RAM:         64000000000,
+			VCPUs:       2,
+		}
+		err = runner.TranslatePaths(inputFilename)
+		if err != nil {
+			return 1
+		}
+		runner.Args = []string{"filter", "-local=true",
+			"-i", *inputFilename,
+			"-o", "/mnt/output/library.gob",
+			"-max-variants", fmt.Sprintf("%d", *maxvariants),
+			"-min-coverage", fmt.Sprintf("%f", *mincoverage),
+			"-max-tag", fmt.Sprintf("%d", *maxtag),
+		}
+		err = runner.Run()
+		if err != nil {
+			return 1
+		}
+		return 0
+	}
+
+	var infile io.ReadCloser
+	if *inputFilename == "" {
+		infile = ioutil.NopCloser(stdin)
+	} else {
+		infile, err = os.Open(*inputFilename)
+		if err != nil {
+			return 1
+		}
+		defer infile.Close()
+	}
 	log.Print("reading")
-	cgs, err := ReadCompactGenomes(stdin)
+	cgs, err := ReadCompactGenomes(infile)
+	if err != nil {
+		return 1
+	}
+	err = infile.Close()
 	if err != nil {
 		return 1
 	}
@@ -105,7 +158,17 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 
 	log.Print("filtering done")
 
-	w := bufio.NewWriter(cmd.output)
+	var outfile io.WriteCloser
+	if *outputFilename == "" {
+		outfile = nopCloser{cmd.output}
+	} else {
+		outfile, err = os.OpenFile(*outputFilename, os.O_CREATE|os.O_WRONLY, 0777)
+		if err != nil {
+			return 1
+		}
+		defer outfile.Close()
+	}
+	w := bufio.NewWriter(outfile)
 	enc := gob.NewEncoder(w)
 	log.Print("writing")
 	err = enc.Encode(LibraryEntry{
@@ -116,6 +179,10 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 	}
 	log.Print("writing done")
 	err = w.Flush()
+	if err != nil {
+		return 1
+	}
+	err = outfile.Close()
 	if err != nil {
 		return 1
 	}

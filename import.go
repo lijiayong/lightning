@@ -46,7 +46,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 	flags.StringVar(&cmd.tagLibraryFile, "tag-library", "", "tag library fasta `file`")
 	flags.StringVar(&cmd.refFile, "ref", "", "reference fasta `file`")
 	flags.StringVar(&cmd.outputFile, "o", "", "output `file`")
-	flags.StringVar(&cmd.projectUUID, "project", "", "project `UUID` for storing intermediate and output data")
+	flags.StringVar(&cmd.projectUUID, "project", "", "project `UUID` for output data")
 	flags.BoolVar(&cmd.runLocal, "local", false, "run on local host (default: run in an arvados container)")
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
 	err = flags.Parse(args)
@@ -74,6 +74,8 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 			Name:        "lightning import",
 			Client:      arvados.NewClientFromEnv(),
 			ProjectUUID: cmd.projectUUID,
+			RAM:         30000000000,
+			VCPUs:       16,
 		}
 		err = runner.TranslatePaths(&cmd.tagLibraryFile, &cmd.refFile, &cmd.outputFile)
 		if err != nil {
@@ -118,33 +120,30 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 		}
 	}()
 
-	var outfile *os.File
-	var w *bufio.Writer
+	var output io.WriteCloser
 	if cmd.outputFile == "" {
-		w = bufio.NewWriter(stdout)
+		output = nopCloser{stdout}
 	} else {
-		outfile, err = os.OpenFile(cmd.outputFile, os.O_CREATE|os.O_WRONLY, 0777)
+		output, err = os.OpenFile(cmd.outputFile, os.O_CREATE|os.O_WRONLY, 0777)
 		if err != nil {
 			return 1
 		}
-		defer outfile.Close()
-		w = bufio.NewWriter(outfile)
+		defer output.Close()
 	}
-	cmd.encoder = gob.NewEncoder(w)
+	bufw := bufio.NewWriter(output)
+	cmd.encoder = gob.NewEncoder(bufw)
 
 	err = cmd.tileInputs(tilelib, infiles)
 	if err != nil {
 		return 1
 	}
-	err = w.Flush()
+	err = bufw.Flush()
 	if err != nil {
 		return 1
 	}
-	if outfile != nil {
-		err = outfile.Close()
-		if err != nil {
-			return 1
-		}
+	err = output.Close()
+	if err != nil {
+		return 1
 	}
 	return 0
 }

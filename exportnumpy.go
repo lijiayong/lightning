@@ -2,13 +2,16 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 
+	"git.arvados.org/arvados.git/sdk/go/arvados"
 	"github.com/kshedden/gonpy"
 )
 
@@ -26,6 +29,10 @@ func (cmd *exportNumpy) RunCommand(prog string, args []string, stdin io.Reader, 
 	flags := flag.NewFlagSet("", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
+	runlocal := flags.Bool("local", false, "run on local host (default: run in an arvados container)")
+	projectUUID := flags.String("project", "", "project `UUID` for output data")
+	inputFilename := flags.String("i", "", "input `file`")
+	outputFilename := flags.String("o", "", "output `file`")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
 		err = nil
@@ -39,6 +46,30 @@ func (cmd *exportNumpy) RunCommand(prog string, args []string, stdin io.Reader, 
 		go func() {
 			log.Println(http.ListenAndServe(*pprof, nil))
 		}()
+	}
+
+	if !*runlocal {
+		if *outputFilename != "" {
+			err = errors.New("cannot specify output file in container mode: not implemented")
+			return 1
+		}
+		runner := arvadosContainerRunner{
+			Name:        "lightning export-numpy",
+			Client:      arvados.NewClientFromEnv(),
+			ProjectUUID: *projectUUID,
+			RAM:         64000000000,
+			VCPUs:       2,
+		}
+		err = runner.TranslatePaths(inputFilename)
+		if err != nil {
+			return 1
+		}
+		runner.Args = []string{"export-numpy", "-local=true", "-i", *inputFilename, "-o", "/mnt/output/library.npy"}
+		err = runner.Run()
+		if err != nil {
+			return 1
+		}
+		return 0
 	}
 
 	cgs, err := ReadCompactGenomes(stdin)
@@ -58,14 +89,29 @@ func (cmd *exportNumpy) RunCommand(prog string, args []string, stdin io.Reader, 
 			out[row*cols+i] = uint16(v)
 		}
 	}
-	w := bufio.NewWriter(cmd.output)
-	npw, err := gonpy.NewWriter(nopCloser{w})
+
+	var output io.WriteCloser
+	if *outputFilename == "" {
+		output = nopCloser{cmd.output}
+	} else {
+		output, err = os.OpenFile(*outputFilename, os.O_CREATE|os.O_WRONLY, 0777)
+		if err != nil {
+			return 1
+		}
+		defer output.Close()
+	}
+	bufw := bufio.NewWriter(output)
+	npw, err := gonpy.NewWriter(nopCloser{bufw})
 	if err != nil {
 		return 1
 	}
 	npw.Shape = []int{rows, cols}
 	npw.WriteUint16(out)
-	err = w.Flush()
+	err = bufw.Flush()
+	if err != nil {
+		return 1
+	}
+	err = output.Close()
 	if err != nil {
 		return 1
 	}
