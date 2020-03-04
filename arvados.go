@@ -22,23 +22,23 @@ type arvadosContainerRunner struct {
 	RAM         int64
 	Prog        string // if empty, run /proc/self/exe
 	Args        []string
-	Mounts      map[string]string
+	Mounts      map[string]map[string]interface{}
 }
-
-var (
-	collectionInPathRe = regexp.MustCompile(`^(.*/)?([0-9a-f]{32}\+[0-9]+|[0-9a-z]{5}-[0-9a-z]{5}-[0-9a-z]{15})(/.*)?$`)
-)
 
 func (runner *arvadosContainerRunner) Run() error {
 	if runner.ProjectUUID == "" {
 		return errors.New("cannot run arvados container: ProjectUUID not provided")
 	}
+
 	mounts := map[string]map[string]interface{}{
 		"/mnt/output": {
 			"kind":     "tmp",
 			"writable": true,
 			"capacity": 100000000000,
 		},
+	}
+	for path, mnt := range runner.Mounts {
+		mounts[path] = mnt
 	}
 
 	prog := runner.Prog
@@ -55,12 +55,6 @@ func (runner *arvadosContainerRunner) Run() error {
 	}
 	command := append([]string{prog}, runner.Args...)
 
-	for uuid, mnt := range runner.Mounts {
-		mounts[mnt] = map[string]interface{}{
-			"kind": "collection",
-			"uuid": uuid,
-		}
-	}
 	rc := arvados.RuntimeConstraints{
 		VCPUs:        runner.VCPUs,
 		RAM:          runner.RAM,
@@ -85,9 +79,11 @@ func (runner *arvadosContainerRunner) Run() error {
 	return err
 }
 
+var collectionInPathRe = regexp.MustCompile(`^(.*/)?([0-9a-f]{32}\+[0-9]+|[0-9a-z]{5}-[0-9a-z]{5}-[0-9a-z]{15})(/.*)?$`)
+
 func (runner *arvadosContainerRunner) TranslatePaths(paths ...*string) error {
 	if runner.Mounts == nil {
-		runner.Mounts = make(map[string]string)
+		runner.Mounts = make(map[string]map[string]interface{})
 	}
 	for _, path := range paths {
 		if *path == "" {
@@ -98,12 +94,15 @@ func (runner *arvadosContainerRunner) TranslatePaths(paths ...*string) error {
 			return fmt.Errorf("cannot find uuid in path: %q", *path)
 		}
 		uuid := m[2]
-		mnt, ok := runner.Mounts[uuid]
+		mnt, ok := runner.Mounts["/mnt/"+uuid]
 		if !ok {
-			mnt = "/mnt/" + uuid
-			runner.Mounts[uuid] = mnt
+			mnt = map[string]interface{}{
+				"kind": "collection",
+				"uuid": uuid,
+			}
+			runner.Mounts["/mnt/"+uuid] = mnt
 		}
-		*path = mnt + m[3]
+		*path = "/mnt/" + uuid + m[3]
 	}
 	return nil
 }
