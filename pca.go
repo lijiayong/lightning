@@ -21,7 +21,7 @@ func (cmd *pythonPCA) RunCommand(prog string, args []string, stdin io.Reader, st
 	flags := flag.NewFlagSet("", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	projectUUID := flags.String("project", "", "project `UUID` for output data")
-	inputFilename := flags.String("i", "", "input `file`")
+	inputFilename := flags.String("i", "-", "input `file`")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
 		err = nil

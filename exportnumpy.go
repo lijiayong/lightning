@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -29,8 +30,8 @@ func (cmd *exportNumpy) RunCommand(prog string, args []string, stdin io.Reader, 
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
 	runlocal := flags.Bool("local", false, "run on local host (default: run in an arvados container)")
 	projectUUID := flags.String("project", "", "project `UUID` for output data")
-	inputFilename := flags.String("i", "", "input `file`")
-	outputFilename := flags.String("o", "", "output `file`")
+	inputFilename := flags.String("i", "-", "input `file`")
+	outputFilename := flags.String("o", "-", "output `file`")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
 		err = nil
@@ -46,7 +47,7 @@ func (cmd *exportNumpy) RunCommand(prog string, args []string, stdin io.Reader, 
 	}
 
 	if !*runlocal {
-		if *outputFilename != "" {
+		if *outputFilename != "-" {
 			err = errors.New("cannot specify output file in container mode: not implemented")
 			return 1
 		}
@@ -69,7 +70,21 @@ func (cmd *exportNumpy) RunCommand(prog string, args []string, stdin io.Reader, 
 		return 0
 	}
 
-	cgs, err := ReadCompactGenomes(stdin)
+	var input io.ReadCloser
+	if *inputFilename == "-" {
+		input = ioutil.NopCloser(stdin)
+	} else {
+		input, err = os.Open(*inputFilename)
+		if err != nil {
+			return 1
+		}
+		defer input.Close()
+	}
+	cgs, err := ReadCompactGenomes(input)
+	if err != nil {
+		return 1
+	}
+	err = input.Close()
 	if err != nil {
 		return 1
 	}
@@ -88,7 +103,7 @@ func (cmd *exportNumpy) RunCommand(prog string, args []string, stdin io.Reader, 
 	}
 
 	var output io.WriteCloser
-	if *outputFilename == "" {
+	if *outputFilename == "-" {
 		output = nopCloser{stdout}
 	} else {
 		output, err = os.OpenFile(*outputFilename, os.O_CREATE|os.O_WRONLY, 0777)

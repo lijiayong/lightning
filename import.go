@@ -45,7 +45,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 	flags.SetOutput(stderr)
 	flags.StringVar(&cmd.tagLibraryFile, "tag-library", "", "tag library fasta `file`")
 	flags.StringVar(&cmd.refFile, "ref", "", "reference fasta `file`")
-	flags.StringVar(&cmd.outputFile, "o", "", "output `file`")
+	flags.StringVar(&cmd.outputFile, "o", "-", "output `file`")
 	flags.StringVar(&cmd.projectUUID, "project", "", "project `UUID` for output data")
 	flags.BoolVar(&cmd.runLocal, "local", false, "run on local host (default: run in an arvados container)")
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
@@ -88,7 +88,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 				return 1
 			}
 		}
-		if cmd.outputFile == "" {
+		if cmd.outputFile == "-" {
 			cmd.outputFile = "/mnt/output/library.gob"
 		} else {
 			// Not yet implemented, but this should write
@@ -121,7 +121,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 	}()
 
 	var output io.WriteCloser
-	if cmd.outputFile == "" {
+	if cmd.outputFile == "-" {
 		output = nopCloser{stdout}
 	} else {
 		output, err = os.OpenFile(cmd.outputFile, os.O_CREATE|os.O_WRONLY, 0777)

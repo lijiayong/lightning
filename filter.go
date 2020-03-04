@@ -32,8 +32,8 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
 	runlocal := flags.Bool("local", false, "run on local host (default: run in an arvados container)")
 	projectUUID := flags.String("project", "", "project `UUID` for output data")
-	inputFilename := flags.String("i", "", "input `file`")
-	outputFilename := flags.String("o", "", "output `file`")
+	inputFilename := flags.String("i", "-", "input `file`")
+	outputFilename := flags.String("o", "-", "output `file`")
 	maxvariants := flags.Int("max-variants", -1, "drop tiles with more than `N` variants")
 	mincoverage := flags.Float64("min-coverage", 1, "drop tiles with coverage less than `P` across all haplotypes (0 < P ≤ 1)")
 	maxtag := flags.Int("max-tag", -1, "drop tiles with tag ID > `N`")
@@ -53,7 +53,7 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 	}
 
 	if !*runlocal {
-		if *outputFilename != "" {
+		if *outputFilename != "-" {
 			err = errors.New("cannot specify output file in container mode: not implemented")
 			return 1
 		}
@@ -83,7 +83,7 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 	}
 
 	var infile io.ReadCloser
-	if *inputFilename == "" {
+	if *inputFilename == "-" {
 		infile = ioutil.NopCloser(stdin)
 	} else {
 		infile, err = os.Open(*inputFilename)
@@ -159,7 +159,7 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 	log.Print("filtering done")
 
 	var outfile io.WriteCloser
-	if *outputFilename == "" {
+	if *outputFilename == "-" {
 		outfile = nopCloser{cmd.output}
 	} else {
 		outfile, err = os.OpenFile(*outputFilename, os.O_CREATE|os.O_WRONLY, 0777)
