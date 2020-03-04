@@ -129,7 +129,7 @@ func (runner *arvadosContainerRunner) makeCommandCollection() (string, error) {
 	}
 	if len(existing.Items) > 0 {
 		uuid := existing.Items[0].UUID
-		log.Printf("using existing collection %q named %q (did not verify whether content matches)", uuid, cname)
+		log.Printf("using lightning binary in existing collection %s (name is %q; did not verify whether content matches)", uuid, cname)
 		return uuid, nil
 	}
 	log.Printf("writing lightning binary to new collection %q", cname)
@@ -169,6 +169,6 @@ func (runner *arvadosContainerRunner) makeCommandCollection() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Printf("collection: %#v", coll)
+	log.Printf("stored lightning binary in new collection %s", coll.UUID)
 	return coll.UUID, nil
 }
