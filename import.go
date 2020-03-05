@@ -307,9 +307,10 @@ func (cmd *importer) tileInputs(tilelib *tileLibrary, infiles []string) error {
 	}
 	go close(todo)
 	var tileJobs sync.WaitGroup
-	running := int64(runtime.NumCPU())
-	for i := 0; i < runtime.NumCPU(); i++ {
+	var running int64
+	for i := 0; i < runtime.NumCPU()*9/8+1; i++ {
 		tileJobs.Add(1)
+		atomic.AddInt64(&running, 1)
 		go func() {
 			defer tileJobs.Done()
 			defer atomic.AddInt64(&running, -1)
