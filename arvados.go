@@ -289,7 +289,9 @@ func (runner *arvadosContainerRunner) logStream(uuid string) *logStream {
 				log.Printf("error decoding websocket message: %s", err)
 				return
 			}
-			ch <- msg
+			if msg.ObjectUUID == uuid {
+				ch <- msg
+			}
 			select {
 			case <-done:
 				return
