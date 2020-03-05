@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/url"
 	"os"
 	"regexp"
@@ -15,6 +14,7 @@ import (
 	"git.arvados.org/arvados.git/sdk/go/arvados"
 	"git.arvados.org/arvados.git/sdk/go/arvadosclient"
 	"git.arvados.org/arvados.git/sdk/go/keepclient"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/blake2b"
 	"golang.org/x/net/websocket"
 )

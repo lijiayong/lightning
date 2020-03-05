@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -23,6 +22,7 @@ import (
 	"time"
 
 	"git.arvados.org/arvados.git/sdk/go/arvados"
+	log "github.com/sirupsen/logrus"
 )
 
 type importer struct {
@@ -117,7 +117,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 		return 1
 	}
 	go func() {
-		for range time.Tick(10 * time.Second) {
+		for range time.Tick(10 * time.Minute) {
 			log.Printf("tilelib.Len() == %d", tilelib.Len())
 		}
 	}()

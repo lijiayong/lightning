@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 
 	"git.arvados.org/arvados.git/sdk/go/arvados"
 	"github.com/kshedden/gonpy"
+	log "github.com/sirupsen/logrus"
 )
 
 type exportNumpy struct{}

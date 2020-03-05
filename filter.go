@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 
 	"git.arvados.org/arvados.git/sdk/go/arvados"
+	log "github.com/sirupsen/logrus"
 )
 
 type filterer struct {

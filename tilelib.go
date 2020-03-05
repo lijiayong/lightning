@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"log"
 	"strings"
 	"sync"
 
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -65,7 +65,7 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 			if len(buf) == 0 || buf[0] == '>' {
 				todo <- jobT{seqlabel, fasta}
 				seqlabel, fasta = string(buf[1:]), nil
-				log.Printf("%s %s reading fasta", filelabel, seqlabel)
+				log.Debugf("%s %s reading fasta", filelabel, seqlabel)
 			} else {
 				fasta = append(fasta, bytes.ToLower(buf)...)
 			}
@@ -73,11 +73,16 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 		todo <- jobT{seqlabel, fasta}
 	}()
 	path := make([]tileLibRef, 2000000)
+	totalPathLen := 0
+	skippedSequences := 0
 	for job := range todo {
-		if len(job.fasta) == 0 || strings.Contains(job.label, "_") {
+		if len(job.fasta) == 0 {
+			continue
+		} else if strings.Contains(job.label, "_") {
+			skippedSequences++
 			continue
 		}
-		log.Printf("%s %s tiling", filelabel, job.label)
+		log.Debugf("%s %s tiling", filelabel, job.label)
 		path = path[:0]
 		tilestart := -1        // position in fasta of tile that ends here
 		tiletagid := tagID(-1) // tag id starting tile that ends here
@@ -94,8 +99,10 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 		pathcopy := make([]tileLibRef, len(path))
 		copy(pathcopy, path)
 		ret[job.label] = pathcopy
-		log.Printf("%s %s tiled with path len %d", filelabel, job.label, len(path))
+		log.Debugf("%s %s tiled with path len %d", filelabel, job.label, len(path))
+		totalPathLen += len(path)
 	}
+	log.Printf("%s tiled with total path len %d in %d sequences (skipped %d sequences with '_' in name)", filelabel, totalPathLen, len(ret), skippedSequences)
 	return ret, scanner.Err()
 }
 

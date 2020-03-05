@@ -10,6 +10,7 @@ require (
 	github.com/kshedden/gonpy v0.0.0-20190510000443-66c21fac4672
 	github.com/prometheus/client_golang v1.5.0 // indirect
 	github.com/prometheus/procfs v0.0.10 // indirect
+	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/crypto v0.0.0-20200302210943-78000ba7a073
 	golang.org/x/net v0.0.0-20200301022130-244492dfa37a
 	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 // indirect
