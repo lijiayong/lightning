@@ -108,7 +108,7 @@ func (runner *arvadosContainerRunner) Run() (string, error) {
 	}
 
 	subscribedUUID := ""
-	for cr.State != arvados.ContainerRequestState(arvados.ContainerRequestStateFinal) {
+	for cr.State != arvados.ContainerRequestStateFinal {
 		if logch == nil && cr.ContainerUUID != subscribedUUID {
 			if logstream != nil {
 				logstream.Close()
