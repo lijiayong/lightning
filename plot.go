@@ -51,10 +51,12 @@ func (cmd *pythonPlot) RunCommand(prog string, args []string, stdin io.Reader, s
 	}
 	runner.Prog = "python3"
 	runner.Args = []string{"/plot.py", *inputFilename, *sampleCSVFilename, *sampleFastaDirname, "/mnt/output/plot.png"}
-	err = runner.Run()
+	var output string
+	output, err = runner.Run()
 	if err != nil {
 		return 1
 	}
+	fmt.Fprintln(stdout, output+"/plot.png")
 	return 0
 }
 

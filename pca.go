@@ -46,9 +46,11 @@ func (cmd *pythonPCA) RunCommand(prog string, args []string, stdin io.Reader, st
 import scipy
 from sklearn.decomposition import PCA
 scipy.save(sys.argv[2], PCA(n_components=4).fit_transform(scipy.load(sys.argv[1])))`, *inputFilename, "/mnt/output/pca.npy"}
-	err = runner.Run()
+	var output string
+	output, err = runner.Run()
 	if err != nil {
 		return 1
 	}
+	fmt.Fprintln(stdout, output+"/pca.npy")
 	return 0
 }

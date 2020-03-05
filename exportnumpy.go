@@ -63,10 +63,12 @@ func (cmd *exportNumpy) RunCommand(prog string, args []string, stdin io.Reader, 
 			return 1
 		}
 		runner.Args = []string{"export-numpy", "-local=true", "-i", *inputFilename, "-o", "/mnt/output/library.npy"}
-		err = runner.Run()
+		var output string
+		output, err = runner.Run()
 		if err != nil {
 			return 1
 		}
+		fmt.Fprintln(stdout, output+"/library.npy")
 		return 0
 	}
 

@@ -98,10 +98,12 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 			return 1
 		}
 		runner.Args = append([]string{"import", "-local=true", "-tag-library", cmd.tagLibraryFile, "-ref", cmd.refFile, "-o", cmd.outputFile}, inputs...)
-		err = runner.Run()
+		var output string
+		output, err = runner.Run()
 		if err != nil {
 			return 1
 		}
+		fmt.Fprintln(stdout, output+"/library.gob")
 		return 0
 	}
 

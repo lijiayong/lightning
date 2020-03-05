@@ -75,10 +75,12 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 			"-min-coverage", fmt.Sprintf("%f", *mincoverage),
 			"-max-tag", fmt.Sprintf("%d", *maxtag),
 		}
-		err = runner.Run()
+		var output string
+		output, err = runner.Run()
 		if err != nil {
 			return 1
 		}
+		fmt.Fprintln(stdout, output+"/library.gob")
 		return 0
 	}
 
