@@ -16,7 +16,6 @@ unfiltered=$(
     lightning import       -project ${project} \
        -tag-library ${tags}/tagset.fa.gz \
        ${fasta})
-unfiltered=su92l-4zz18-fcyucnod8y4515p/library.gob
 filtered=$(
     lightning filter       -project ${project} \
        -i ${unfiltered} \
