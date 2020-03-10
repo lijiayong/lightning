@@ -30,6 +30,8 @@ type vcf2fasta struct {
 	outputDir         string
 	runLocal          bool
 	vcpus             int
+
+	stderr io.Writer
 }
 
 func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -63,6 +65,7 @@ func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, st
 		flags.Usage()
 		return 2
 	}
+	cmd.stderr = stderr
 
 	if *pprof != "" {
 		go func() {
@@ -217,6 +220,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		bed := exec.Command(bedargs[0], bedargs[1:]...)
 		bed.Stdin = bytes.NewBuffer(cmd.gvcfRegionsPyData)
 		bed.Stdout = bedw
+		bed.Stderr = cmd.stderr
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -233,6 +237,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		bedcomp := exec.Command(bedcompargs[0], bedcompargs[1:]...)
 		bedcomp.Stdin = bedr
 		bedcomp.Stdout = bedcompw
+		bedcomp.Stderr = cmd.stderr
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -259,6 +264,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		consensus := exec.Command(consargs[0], consargs[1:]...)
 		consensus.Stderr = os.Stderr
 		consensus.Stdout = gzipw
+		consensus.Stderr = cmd.stderr
 		if maskfile != nil {
 			consensus.Stdin = maskfile
 		}
