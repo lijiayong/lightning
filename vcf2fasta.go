@@ -238,7 +238,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 			return err
 		}
 		bedcompargs := []string{"bedtools", "complement", "-i", "/dev/stdin", "-g", cmd.genomeFile}
-		bedcompargs = maybeInDocker(bedcompargs, []string{cmd.refFile, infile})
+		bedcompargs = maybeInDocker(bedcompargs, []string{cmd.genomeFile})
 		bedcomp := exec.Command(bedcompargs[0], bedcompargs[1:]...)
 		bedcomp.Stdin = bedr
 		bedcomp.Stdout = bedcompw
