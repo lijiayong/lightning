@@ -28,6 +28,7 @@ type arvadosContainerRunner struct {
 	Prog        string // if empty, run /proc/self/exe
 	Args        []string
 	Mounts      map[string]map[string]interface{}
+	Priority    int
 }
 
 func (runner *arvadosContainerRunner) Run() (string, error) {
@@ -60,6 +61,10 @@ func (runner *arvadosContainerRunner) Run() (string, error) {
 	}
 	command := append([]string{prog}, runner.Args...)
 
+	priority := runner.Priority
+	if priority < 1 {
+		priority = 500
+	}
 	rc := arvados.RuntimeConstraints{
 		VCPUs:        runner.VCPUs,
 		RAM:          runner.RAM,
@@ -76,7 +81,7 @@ func (runner *arvadosContainerRunner) Run() (string, error) {
 			"use_existing":        true,
 			"output_path":         "/mnt/output",
 			"runtime_constraints": rc,
-			"priority":            1,
+			"priority":            runner.Priority,
 			"state":               arvados.ContainerRequestStateCommitted,
 		},
 	})

@@ -47,6 +47,7 @@ func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, st
 	flags.StringVar(&cmd.outputDir, "output-dir", "", "output directory")
 	flags.IntVar(&cmd.vcpus, "vcpus", 0, "number of VCPUs to request for arvados container (default: 2*number of input files, max 32)")
 	flags.BoolVar(&cmd.runLocal, "local", false, "run on local host (default: run in an arvados container)")
+	priority := flags.Int("priority", 500, "container request priority")
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
@@ -89,6 +90,7 @@ func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, st
 			ProjectUUID: cmd.projectUUID,
 			RAM:         2<<30 + int64(cmd.vcpus)<<28,
 			VCPUs:       cmd.vcpus,
+			Priority:    *priority,
 		}
 		err = runner.TranslatePaths(&cmd.refFile)
 		if err != nil {

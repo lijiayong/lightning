@@ -48,6 +48,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 	flags.StringVar(&cmd.outputFile, "o", "-", "output `file`")
 	flags.StringVar(&cmd.projectUUID, "project", "", "project `UUID` for output data")
 	flags.BoolVar(&cmd.runLocal, "local", false, "run on local host (default: run in an arvados container)")
+	priority := flags.Int("priority", 500, "container request priority")
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
@@ -76,6 +77,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 			ProjectUUID: cmd.projectUUID,
 			RAM:         30000000000,
 			VCPUs:       16,
+			Priority:    *priority,
 		}
 		err = runner.TranslatePaths(&cmd.tagLibraryFile, &cmd.refFile, &cmd.outputFile)
 		if err != nil {

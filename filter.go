@@ -32,6 +32,7 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
 	runlocal := flags.Bool("local", false, "run on local host (default: run in an arvados container)")
 	projectUUID := flags.String("project", "", "project `UUID` for output data")
+	priority := flags.Int("priority", 500, "container request priority")
 	inputFilename := flags.String("i", "-", "input `file`")
 	outputFilename := flags.String("o", "-", "output `file`")
 	maxvariants := flags.Int("max-variants", -1, "drop tiles with more than `N` variants")
@@ -63,6 +64,7 @@ func (cmd *filterer) RunCommand(prog string, args []string, stdin io.Reader, std
 			ProjectUUID: *projectUUID,
 			RAM:         64000000000,
 			VCPUs:       2,
+			Priority:    *priority,
 		}
 		err = runner.TranslatePaths(inputFilename)
 		if err != nil {

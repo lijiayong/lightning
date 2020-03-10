@@ -24,6 +24,7 @@ func (cmd *pythonPlot) RunCommand(prog string, args []string, stdin io.Reader, s
 	inputFilename := flags.String("i", "-", "input `file`")
 	sampleCSVFilename := flags.String("labels-csv", "", "use first two columns of `labels.csv` as id->color mapping")
 	sampleFastaDirname := flags.String("sample-fasta-dir", "", "`directory` containing fasta input files")
+	priority := flags.Int("priority", 500, "container request priority")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
 		err = nil
@@ -38,6 +39,7 @@ func (cmd *pythonPlot) RunCommand(prog string, args []string, stdin io.Reader, s
 		ProjectUUID: *projectUUID,
 		RAM:         1 << 30,
 		VCPUs:       1,
+		Priority:    *priority,
 		Mounts: map[string]map[string]interface{}{
 			"/plot.py": map[string]interface{}{
 				"kind":    "text",

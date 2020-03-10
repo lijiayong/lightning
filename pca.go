@@ -22,6 +22,7 @@ func (cmd *pythonPCA) RunCommand(prog string, args []string, stdin io.Reader, st
 	flags.SetOutput(stderr)
 	projectUUID := flags.String("project", "", "project `UUID` for output data")
 	inputFilename := flags.String("i", "-", "input `file`")
+	priority := flags.Int("priority", 500, "container request priority")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
 		err = nil
@@ -36,6 +37,7 @@ func (cmd *pythonPCA) RunCommand(prog string, args []string, stdin io.Reader, st
 		ProjectUUID: *projectUUID,
 		RAM:         120000000000,
 		VCPUs:       1,
+		Priority:    *priority,
 	}
 	err = runner.TranslatePaths(inputFilename)
 	if err != nil {
