@@ -220,6 +220,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			log.Printf("running %v", bed.Args)
 			errs <- bed.Run()
 		}()
 
@@ -235,43 +236,55 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			log.Printf("running %v", bedcomp.Args)
 			errs <- bedcomp.Run()
 		}()
 		maskfile = bedcompr
 	}
 
-	consargs := []string{"bcftools", "consensus", "--fasta-ref", cmd.refFile, "-H", fmt.Sprint(phase)}
-	if maskfile != nil {
-		consargs = append(consargs, "--mask", "/dev/fd/3")
-	}
-	consargs = append(consargs, infile)
-	indexsuffix := ".tbi"
-	if _, err := os.Stat(infile + ".csi"); err == nil {
-		indexsuffix = ".csi"
-	}
-	consargs = maybeInDocker(consargs, []string{infile, infile + indexsuffix, cmd.refFile})
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		consargs := []string{"bcftools", "consensus", "--fasta-ref", cmd.refFile, "-H", fmt.Sprint(phase)}
+		if maskfile != nil {
+			consargs = append(consargs, "--mask", "/dev/fd/3")
+		}
+		consargs = append(consargs, infile)
+		indexsuffix := ".tbi"
+		if _, err := os.Stat(infile + ".csi"); err == nil {
+			indexsuffix = ".csi"
+		}
+		consargs = maybeInDocker(consargs, []string{infile, infile + indexsuffix, cmd.refFile})
 
-	consensus := exec.Command(consargs[0], consargs[1:]...)
-	consensus.Stderr = os.Stderr
-	consensus.Stdout = gzipw
-	if maskfile != nil {
-		consensus.ExtraFiles = []*os.File{maskfile}
-	}
-	err = consensus.Start()
-	if err != nil {
-		return err
-	}
-	err = consensus.Wait()
-	if err != nil {
-		return err
-	}
-	err = gzipw.Close()
-	if err != nil {
-		return err
-	}
-	err = outf.Close()
-	if err != nil {
-		return err
+		consensus := exec.Command(consargs[0], consargs[1:]...)
+		consensus.Stderr = os.Stderr
+		consensus.Stdout = gzipw
+		if maskfile != nil {
+			consensus.ExtraFiles = []*os.File{maskfile}
+		}
+		log.Printf("running %v", consensus.Args)
+		err = consensus.Run()
+		if err != nil {
+			errs <- err
+			return
+		}
+		err = gzipw.Close()
+		if err != nil {
+			errs <- err
+			return
+		}
+		errs <- outf.Close()
+	}()
+
+	go func() {
+		wg.Wait()
+		close(errs)
+	}()
+
+	for err := range errs {
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
