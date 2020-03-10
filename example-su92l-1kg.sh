@@ -8,7 +8,8 @@ lightning build-docker-image
 arv keep docker lightning-runtime
 
 project=su92l-j7d0g-jzei0m9yvgauhjf
-gvcf=su92l-4zz18-ykpcoea5nisz74f
+gvcf=su92l-4zz18-bgyq36m6gctk63q
+info=su92l-4zz18-ykpcoea5nisz74f
 fasta=su92l-4zz18-s3e6as6uzsoocsb
 tags=su92l-4zz18-92bx4zjg5hgs3yc
 
@@ -29,7 +30,7 @@ pca=$(
 plot=$(
     lightning plot         -project ${project} \
        -i ${pca} \
-       -labels-csv ${gvcf}/sample_info.csv \
+       -labels-csv ${info}/sample_info.csv \
        -sample-fasta-dir ${fasta})
 echo >&2 "https://workbench2.${plot%%-*}.arvadosapi.com/collections/${plot}"
 echo ${plot%%/*}
