@@ -23,6 +23,7 @@ import (
 
 type vcf2fasta struct {
 	refFile           string
+	genomeFile        string
 	mask              bool
 	gvcfRegionsPy     string
 	gvcfRegionsPyData []byte
@@ -44,6 +45,7 @@ func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, st
 	flags := flag.NewFlagSet("", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	flags.StringVar(&cmd.refFile, "ref", "", "reference fasta `file`")
+	flags.StringVar(&cmd.genomeFile, "genome", "", "reference genome `file`")
 	flags.BoolVar(&cmd.mask, "mask", false, "mask uncalled regions (default: output hom ref)")
 	flags.StringVar(&cmd.gvcfRegionsPy, "gvcf-regions.py", "https://raw.githubusercontent.com/lijiayong/gvcf_regions/master/gvcf_regions.py", "source of gvcf_regions.py")
 	flags.StringVar(&cmd.projectUUID, "project", "", "project `UUID` for containers and output data")
@@ -212,6 +214,9 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 	var wg sync.WaitGroup
 	errs := make(chan error, 3)
 	if cmd.mask {
+		if cmd.genomeFile == "" {
+			return errors.New("cannot apply mask without -genome argument")
+		}
 		bedr, bedw, err := os.Pipe()
 		if err != nil {
 			return err
@@ -232,7 +237,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		if err != nil {
 			return err
 		}
-		bedcompargs := []string{"bedtools", "complement", "-i", "/dev/stdin", "-g", cmd.refFile}
+		bedcompargs := []string{"bedtools", "complement", "-i", "/dev/stdin", "-g", cmd.genomeFile}
 		bedcompargs = maybeInDocker(bedcompargs, []string{cmd.refFile, infile})
 		bedcomp := exec.Command(bedcompargs[0], bedcompargs[1:]...)
 		bedcomp.Stdin = bedr
@@ -289,6 +294,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 
 	for err := range errs {
 		if err != nil {
+			wg.Wait()
 			return err
 		}
 	}

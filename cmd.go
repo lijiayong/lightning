@@ -16,6 +16,7 @@ var (
 		"-version":  cmd.Version,
 		"--version": cmd.Version,
 
+		"ref2genome":         &ref2genome{},
 		"vcf2fasta":          &vcf2fasta{},
 		"import":             &importer{},
 		"export-numpy":       &exportNumpy{},
