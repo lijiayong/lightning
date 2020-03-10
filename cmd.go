@@ -43,7 +43,7 @@ func (cmd *buildDockerImage) RunCommand(prog string, args []string, stdin io.Rea
 RUN DEBIAN_FRONTEND=noninteractive \
   apt-get update && \
   apt-get dist-upgrade -y && \
-  apt-get install -y --no-install-recommends bcftools samtools python3-sklearn python3-matplotlib && \
+  apt-get install -y --no-install-recommends bcftools bedtools samtools python3-sklearn python3-matplotlib && \
   apt-get clean
 `), 0644)
 	if err != nil {
