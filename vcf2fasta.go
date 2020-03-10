@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
 	"git.arvados.org/arvados.git/sdk/go/arvados"
@@ -69,6 +70,13 @@ func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, st
 		}()
 	}
 
+	if cmd.mask {
+		err = cmd.loadRegionsPy()
+		if err != nil {
+			return 1
+		}
+	}
+
 	if !cmd.runLocal {
 		if cmd.outputDir != "" {
 			err = errors.New("cannot specify output dir in non-local mode")
@@ -91,6 +99,12 @@ func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, st
 			RAM:         2<<30 + int64(cmd.vcpus)<<28,
 			VCPUs:       cmd.vcpus,
 			Priority:    *priority,
+			Mounts: map[string]map[string]interface{}{
+				"/gvcf_regions.py": map[string]interface{}{
+					"kind":    "text",
+					"content": string(cmd.gvcfRegionsPyData),
+				},
+			},
 		}
 		err = runner.TranslatePaths(&cmd.refFile)
 		if err != nil {
@@ -103,7 +117,7 @@ func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, st
 				return 1
 			}
 		}
-		runner.Args = append([]string{"vcf2fasta", "-local=true", "-ref", cmd.refFile, fmt.Sprintf("-mask=%v", cmd.mask), "-gvcf-regions.py", cmd.gvcfRegionsPy, "-output-dir", "/mnt/output"}, inputs...)
+		runner.Args = append([]string{"vcf2fasta", "-local=true", "-ref", cmd.refFile, fmt.Sprintf("-mask=%v", cmd.mask), "-gvcf-regions.py", "/gvcf_regions.py", "-output-dir", "/mnt/output"}, inputs...)
 		var output string
 		output, err = runner.Run()
 		if err != nil {
@@ -111,23 +125,6 @@ func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, st
 		}
 		fmt.Fprintln(stdout, output)
 		return 0
-	}
-
-	if cmd.mask {
-		var resp *http.Response
-		resp, err = http.Get(cmd.gvcfRegionsPy)
-		if err != nil {
-			return 1
-		}
-		if resp.StatusCode != http.StatusOK {
-			err = fmt.Errorf("get %q: http status %d", cmd.gvcfRegionsPy, resp.StatusCode)
-			return 1
-		}
-		cmd.gvcfRegionsPyData, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			err = fmt.Errorf("get %q: read body: %s", cmd.gvcfRegionsPy, err)
-			return 1
-		}
 	}
 
 	infiles, err := listInputFiles(flags.Args())
@@ -277,4 +274,29 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		return err
 	}
 	return nil
+}
+
+func (cmd *vcf2fasta) loadRegionsPy() error {
+	if strings.HasPrefix(cmd.gvcfRegionsPy, "http") {
+		resp, err := http.Get(cmd.gvcfRegionsPy)
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("get %q: http status %d", cmd.gvcfRegionsPy, resp.StatusCode)
+		}
+		buf, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("get %q: read body: %s", cmd.gvcfRegionsPy, err)
+		}
+		cmd.gvcfRegionsPyData = buf
+		return nil
+	} else {
+		buf, err := ioutil.ReadFile(cmd.gvcfRegionsPy)
+		if err != nil {
+			return err
+		}
+		cmd.gvcfRegionsPyData = buf
+		return nil
+	}
 }
