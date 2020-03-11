@@ -201,7 +201,7 @@ func maybeInDocker(args, mountfiles []string) []string {
 func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 	_, basename := filepath.Split(infile)
 	outfile := filepath.Join(cmd.outputDir, fmt.Sprintf("%s.%d.fasta.gz", basename, phase))
-	outf, err := os.OpenFile(outfile, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0777)
+	outf, err := os.OpenFile(outfile, os.O_CREATE|os.O_WRONLY, 0777)
 	if err != nil {
 		return fmt.Errorf("error opening output file: %s", err)
 	}
