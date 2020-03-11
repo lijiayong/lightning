@@ -187,7 +187,7 @@ func maybeInDocker(args, mountfiles []string) []string {
 		return args
 	}
 	dockerrun := []string{
-		"docker", "run", "--rm",
+		"docker", "run", "--rm", "-i",
 		"--log-driver=none",
 	}
 	for _, f := range mountfiles {
@@ -229,6 +229,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer bedw.Close()
 			log.Printf("running %v", bed.Args)
 			err := bed.Run()
 			if err != nil {
@@ -249,6 +250,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer bedcompw.Close()
 			log.Printf("running %v", bedcomp.Args)
 			err := bedcomp.Run()
 			if err != nil {
