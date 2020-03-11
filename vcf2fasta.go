@@ -230,7 +230,10 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		go func() {
 			defer wg.Done()
 			log.Printf("running %v", bed.Args)
-			errs <- bed.Run()
+			err := bed.Run()
+			if err != nil {
+				errs <- fmt.Errorf("gvcf_regions: %s", err)
+			}
 		}()
 
 		bedcompr, bedcompw, err := os.Pipe()
@@ -247,7 +250,10 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		go func() {
 			defer wg.Done()
 			log.Printf("running %v", bedcomp.Args)
-			errs <- bedcomp.Run()
+			err := bedcomp.Run()
+			if err != nil {
+				errs <- fmt.Errorf("bedtools complement: %s", err)
+			}
 		}()
 		maskfile = bedcompr
 	}
@@ -276,7 +282,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		log.Printf("running %v", consensus.Args)
 		err = consensus.Run()
 		if err != nil {
-			errs <- err
+			errs <- fmt.Errorf("bcftools consensus: %s", err)
 			return
 		}
 		err = gzipw.Close()
