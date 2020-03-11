@@ -79,7 +79,7 @@ func (cmd *ref2genome) RunCommand(prog string, args []string, stdin io.Reader, s
 		if err != nil {
 			return 1
 		}
-		fmt.Fprintln(stdout, output)
+		fmt.Fprintln(stdout, output+"/ref.genome")
 		return 0
 	}
 
