@@ -213,31 +213,23 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 	var maskfifo string // filename of mask fifo if we're running bedtools, otherwise ""
 
 	var wg sync.WaitGroup
-	errs := make(chan error, 3)
+	errs := make(chan error, 2)
 	if cmd.mask {
 		if cmd.genomeFile == "" {
 			return errors.New("cannot apply mask without -genome argument")
 		}
-		bedr, bedw, err := os.Pipe()
-		if err != nil {
-			return err
-		}
+		var regions bytes.Buffer
 		bedargs := []string{"python", "-", "--gvcf_type", "gatk", infile}
 		bed := exec.Command(bedargs[0], bedargs[1:]...)
 		bed.Stdin = bytes.NewBuffer(cmd.gvcfRegionsPyData)
-		bed.Stdout = bedw
+		bed.Stdout = &regions
 		bed.Stderr = cmd.stderr
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer bedw.Close()
-			log.Printf("running %v", bed.Args)
-			err := bed.Run()
-			log.Printf("exited %v", bed.Args)
-			if err != nil {
-				errs <- fmt.Errorf("gvcf_regions: %s", err)
-			}
-		}()
+		log.Printf("running %v", bed.Args)
+		err := bed.Run()
+		log.Printf("exited %v", bed.Args)
+		if err != nil {
+			return fmt.Errorf("gvcf_regions: %s", err)
+		}
 
 		// The bcftools --mask argument needs to end in ".bed"
 		// in order to be parsed as a BED file, so we need to
@@ -266,7 +258,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 			bedcompargs := []string{"bedtools", "complement", "-i", "/dev/stdin", "-g", cmd.genomeFile}
 			bedcompargs = maybeInDocker(bedcompargs, []string{cmd.genomeFile})
 			bedcomp := exec.Command(bedcompargs[0], bedcompargs[1:]...)
-			bedcomp.Stdin = bedr
+			bedcomp.Stdin = &regions
 			bedcomp.Stdout = maskfifow
 			bedcomp.Stderr = cmd.stderr
 			log.Printf("running %v", bedcomp.Args)
