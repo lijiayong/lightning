@@ -85,6 +85,9 @@ func (runner *arvadosContainerRunner) Run() (string, error) {
 			"state":               arvados.ContainerRequestStateCommitted,
 		},
 	})
+	if err != nil {
+		return "", err
+	}
 	log.Printf("container request UUID: %s", cr.UUID)
 	log.Printf("container UUID: %s", cr.ContainerUUID)
 
