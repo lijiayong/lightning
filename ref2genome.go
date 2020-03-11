@@ -67,6 +67,7 @@ func (cmd *ref2genome) RunCommand(prog string, args []string, stdin io.Reader, s
 			ProjectUUID: cmd.projectUUID,
 			RAM:         1 << 30,
 			Priority:    *priority,
+			VCPUs:       1,
 		}
 		err = runner.TranslatePaths(&cmd.refFile)
 		if err != nil {
