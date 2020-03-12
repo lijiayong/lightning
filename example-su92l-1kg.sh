@@ -10,7 +10,7 @@ arv keep docker lightning-runtime
 priority=501
 project=su92l-j7d0g-jzei0m9yvgauhjf
 ref_fa=su92l-4zz18-u77iyyy7cb05xqv/hg38.fa.gz
-gvcf=su92l-4zz18-bgyq36m6gctk63q
+gvcf=${HOME}/keep/by_id/su92l-4zz18-bgyq36m6gctk63q
 info=su92l-4zz18-ykpcoea5nisz74f
 tags=su92l-4zz18-92bx4zjg5hgs3yc
 
