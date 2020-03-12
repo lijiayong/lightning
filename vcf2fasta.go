@@ -224,7 +224,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 			return errors.New("cannot apply mask without -genome argument")
 		}
 		var regions bytes.Buffer
-		bedargs := []string{"python", "-", "--gvcf_type", "gatk", infile}
+		bedargs := []string{"python2", "-", "--gvcf_type", "gatk", infile}
 		bed := exec.Command(bedargs[0], bedargs[1:]...)
 		bed.Stdin = bytes.NewBuffer(cmd.gvcfRegionsPyData)
 		bed.Stdout = &regions
