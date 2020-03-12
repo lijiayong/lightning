@@ -112,7 +112,7 @@ func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, st
 				},
 			},
 		}
-		err = runner.TranslatePaths(&cmd.refFile)
+		err = runner.TranslatePaths(&cmd.refFile, &cmd.genomeFile)
 		if err != nil {
 			return 1
 		}
@@ -123,7 +123,12 @@ func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, st
 				return 1
 			}
 		}
-		runner.Args = append([]string{"vcf2fasta", "-local=true", "-ref", cmd.refFile, fmt.Sprintf("-mask=%v", cmd.mask), "-gvcf-regions.py", "/gvcf_regions.py", "-output-dir", "/mnt/output"}, inputs...)
+		runner.Args = append([]string{"vcf2fasta",
+			"-local=true",
+			"-ref", cmd.refFile, fmt.Sprintf("-mask=%v", cmd.mask),
+			"-genome", cmd.genomeFile,
+			"-gvcf-regions.py", "/gvcf_regions.py",
+			"-output-dir", "/mnt/output"}, inputs...)
 		var output string
 		output, err = runner.Run()
 		if err != nil {
