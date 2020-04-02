@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -206,6 +207,9 @@ func maybeInDocker(args, mountfiles []string) []string {
 }
 
 func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	_, basename := filepath.Split(infile)
 	outfile := filepath.Join(cmd.outputDir, fmt.Sprintf("%s.%d.fasta.gz", basename, phase))
 	outf, err := os.OpenFile(outfile, os.O_CREATE|os.O_WRONLY, 0777)
@@ -228,7 +232,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 
 		var regions bytes.Buffer
 		bedargs := []string{"python2", "-", "--gvcf_type", "gatk", infile}
-		bed := exec.Command(bedargs[0], bedargs[1:]...)
+		bed := exec.CommandContext(ctx, bedargs[0], bedargs[1:]...)
 		bed.Stdin = bytes.NewBuffer(cmd.gvcfRegionsPyData)
 		bed.Stdout = &regions
 		bed.Stderr = cmd.stderr
@@ -313,7 +317,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 
 			bedcompargs := []string{"bedtools", "complement", "-i", regionsFile, "-g", "/dev/stdin"}
 			bedcompargs = maybeInDocker(bedcompargs, []string{cmd.genomeFile})
-			bedcomp := exec.Command(bedcompargs[0], bedcompargs[1:]...)
+			bedcomp := exec.CommandContext(ctx, bedcompargs[0], bedcompargs[1:]...)
 			bedcomp.Stdin = &sortedGenomeFile
 			bedcomp.Stdout = maskfifow
 			bedcomp.Stderr = cmd.stderr
@@ -350,7 +354,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		}
 		consargs = maybeInDocker(consargs, mounts)
 
-		consensus := exec.Command(consargs[0], consargs[1:]...)
+		consensus := exec.CommandContext(ctx, consargs[0], consargs[1:]...)
 		consensus.Stderr = os.Stderr
 		consensus.Stdout = gzipw
 		consensus.Stderr = cmd.stderr
@@ -375,6 +379,7 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 
 	for err := range errs {
 		if err != nil {
+			cancel()
 			wg.Wait()
 			return err
 		}
