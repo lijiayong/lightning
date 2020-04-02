@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"errors"
@@ -221,8 +222,10 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 	errs := make(chan error, 2)
 	if cmd.mask {
 		if cmd.genomeFile == "" {
+			// TODO: get chromosome sizes from VCF header, ##contig=<ID=chr10,length=133797422>
 			return errors.New("cannot apply mask without -genome argument")
 		}
+
 		var regions bytes.Buffer
 		bedargs := []string{"python2", "-", "--gvcf_type", "gatk", infile}
 		bed := exec.Command(bedargs[0], bedargs[1:]...)
@@ -234,6 +237,43 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		log.Printf("exited %v", bed.Args)
 		if err != nil {
 			return fmt.Errorf("gvcf_regions: %s", err)
+		}
+
+		// "bedtools complement" expects the chromosome sizes
+		// ("genome file") to appear in the same order as the
+		// chromosomes in the input vcf, so we need to sort
+		// them.
+		genomeFile, err := os.Open(cmd.genomeFile)
+		if err != nil {
+			return fmt.Errorf("error opening genome file: %s", err)
+		}
+		chrSize := map[string]int{}
+		scanner := bufio.NewScanner(genomeFile)
+		for scanner.Scan() {
+			var chr string
+			var size int
+			_, err := fmt.Sscanf(scanner.Text(), "%s\t%d", &chr, &size)
+			if err != nil {
+				return fmt.Errorf("error parsing genome file: %s", err)
+			}
+			chrSize[chr] = size
+		}
+		if err = scanner.Err(); err != nil {
+			return fmt.Errorf("error scanning genome file: %s", err)
+		}
+		scanner = bufio.NewScanner(bytes.NewBuffer(append([]byte(nil), regions.Bytes()...)))
+		var sortedGenomeFile bytes.Buffer
+		for scanner.Scan() {
+			var chr string
+			var size int
+			_, err := fmt.Sscanf(scanner.Text(), "%s\t%d", &chr, &size)
+			if err != nil {
+				return fmt.Errorf("error parsing gvcf_regions output: %s", err)
+			}
+			if size, ok := chrSize[chr]; ok {
+				fmt.Fprintf(&sortedGenomeFile, "%s\t%d\n", chr, size)
+				delete(chrSize, chr)
+			}
 		}
 
 		// The bcftools --mask argument needs to end in ".bed"
@@ -249,6 +289,17 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		if err != nil {
 			return fmt.Errorf("mkfifo: %s", err)
 		}
+
+		// bedtools complement can't seem to read from a pipe
+		// reliably -- "Error: line number 1 of file
+		// /dev/stdin has 1 fields, but 3 were expected." --
+		// so we stage to a temp file.
+		regionsFile := filepath.Join(tempdir, "gvcf_regions.bed")
+		err = ioutil.WriteFile(regionsFile, regions.Bytes(), 0644)
+		if err != nil {
+			return err
+		}
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -260,10 +311,10 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 			}
 			defer maskfifow.Close()
 
-			bedcompargs := []string{"bedtools", "complement", "-i", "/dev/stdin", "-g", cmd.genomeFile}
+			bedcompargs := []string{"bedtools", "complement", "-i", regionsFile, "-g", "/dev/stdin"}
 			bedcompargs = maybeInDocker(bedcompargs, []string{cmd.genomeFile})
 			bedcomp := exec.Command(bedcompargs[0], bedcompargs[1:]...)
-			bedcomp.Stdin = &regions
+			bedcomp.Stdin = &sortedGenomeFile
 			bedcomp.Stdout = maskfifow
 			bedcomp.Stderr = cmd.stderr
 			log.Printf("running %v", bedcomp.Args)
