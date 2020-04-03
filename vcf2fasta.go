@@ -15,7 +15,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -225,11 +227,40 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 	var wg sync.WaitGroup
 	errs := make(chan error, 2)
 	if cmd.mask {
-		if cmd.genomeFile == "" {
-			// TODO: get chromosome sizes from VCF header, ##contig=<ID=chr10,length=133797422>
-			return errors.New("cannot apply mask without -genome argument")
-		}
+		chrSize := map[string]int{}
 
+		vcffile, err := os.Open(infile)
+		if err != nil {
+			return err
+		}
+		defer vcffile.Close()
+		var rdr io.Reader = vcffile
+		if strings.HasSuffix(infile, ".gz") {
+			rdr, err = gzip.NewReader(vcffile)
+			if err != nil {
+				return err
+			}
+		}
+		contigre := regexp.MustCompile(`([^=,]*)=([^>,]*)`)
+		scanner := bufio.NewScanner(rdr)
+		for scanner.Scan() {
+			if s := scanner.Text(); !strings.HasPrefix(s, "##") {
+				break
+			} else if !strings.HasPrefix(s, "##contig=<") {
+				continue
+			} else {
+				kv := map[string]string{}
+				for _, m := range contigre.FindAllStringSubmatch(s[10:], -1) {
+					kv[m[1]] = m[2]
+				}
+				if kv["ID"] != "" && kv["length"] != "" {
+					chrSize[kv["ID"]], _ = strconv.Atoi(kv["length"])
+				}
+			}
+		}
+		if err = scanner.Err(); err != nil {
+			return fmt.Errorf("error scanning input file %q: %s", infile, err)
+		}
 		var regions bytes.Buffer
 		bedargs := []string{"python2", "-", "--gvcf_type", "gatk", infile}
 		bed := exec.CommandContext(ctx, bedargs[0], bedargs[1:]...)
@@ -237,34 +268,41 @@ func (cmd *vcf2fasta) vcf2fasta(infile string, phase int) error {
 		bed.Stdout = &regions
 		bed.Stderr = cmd.stderr
 		log.Printf("running %v", bed.Args)
-		err := bed.Run()
+		err = bed.Run()
 		log.Printf("exited %v", bed.Args)
 		if err != nil {
 			return fmt.Errorf("gvcf_regions: %s", err)
+		}
+
+		if cmd.genomeFile != "" {
+			// Read chromosome sizes from genome file in
+			// case any weren't specified in the VCF
+			// header.
+			genomeFile, err := os.Open(cmd.genomeFile)
+			if err != nil {
+				return fmt.Errorf("error opening genome file %q: %s", cmd.genomeFile, err)
+			}
+			scanner := bufio.NewScanner(genomeFile)
+			for scanner.Scan() {
+				var chr string
+				var size int
+				_, err := fmt.Sscanf(scanner.Text(), "%s\t%d", &chr, &size)
+				if err != nil {
+					return fmt.Errorf("error parsing genome file %q: %s", cmd.genomeFile, err)
+				}
+				if chrSize[chr] == 0 {
+					chrSize[chr] = size
+				}
+			}
+			if err = scanner.Err(); err != nil {
+				return fmt.Errorf("error scanning genome file %q: %s", cmd.genomeFile, err)
+			}
 		}
 
 		// "bedtools complement" expects the chromosome sizes
 		// ("genome file") to appear in the same order as the
 		// chromosomes in the input vcf, so we need to sort
 		// them.
-		genomeFile, err := os.Open(cmd.genomeFile)
-		if err != nil {
-			return fmt.Errorf("error opening genome file: %s", err)
-		}
-		chrSize := map[string]int{}
-		scanner := bufio.NewScanner(genomeFile)
-		for scanner.Scan() {
-			var chr string
-			var size int
-			_, err := fmt.Sscanf(scanner.Text(), "%s\t%d", &chr, &size)
-			if err != nil {
-				return fmt.Errorf("error parsing genome file: %s", err)
-			}
-			chrSize[chr] = size
-		}
-		if err = scanner.Err(); err != nil {
-			return fmt.Errorf("error scanning genome file: %s", err)
-		}
 		scanner = bufio.NewScanner(bytes.NewBuffer(append([]byte(nil), regions.Bytes()...)))
 		var sortedGenomeFile bytes.Buffer
 		for scanner.Scan() {
