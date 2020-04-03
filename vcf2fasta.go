@@ -116,6 +116,9 @@ func (cmd *vcf2fasta) RunCommand(prog string, args []string, stdin io.Reader, st
 				},
 			},
 		}
+		if cmd.mask {
+			runner.RAM += int64(cmd.vcpus) << 31
+		}
 		err = runner.TranslatePaths(&cmd.refFile, &cmd.genomeFile)
 		if err != nil {
 			return 1
