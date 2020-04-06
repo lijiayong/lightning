@@ -12,11 +12,11 @@ project=su92l-j7d0g-jzei0m9yvgauhjf
 ref_fa=su92l-4zz18-u77iyyy7cb05xqv/hg38.fa.gz
 gvcf=${HOME}/keep/by_id/su92l-4zz18-bgyq36m6gctk63q
 info=su92l-4zz18-ykpcoea5nisz74f
-tags=su92l-4zz18-92bx4zjg5hgs3yc
+tagset=su92l-4zz18-92bx4zjg5hgs3yc/tagset.fa.gz
 
 genome=$(lightning     ref2genome   -project ${project} -priority ${priority} -ref ${ref_fa})
 fasta=$(lightning      vcf2fasta    -project ${project} -priority ${priority} -ref ${ref_fa} -genome ${genome} -mask=true ${gvcf})
-unfiltered=$(lightning import       -project ${project} -priority ${priority} -tag-library ${tags}/tagset.fa.gz           ${fasta})
+unfiltered=$(lightning import       -project ${project} -priority ${priority} -tag-library ${tagset} ${fasta})
 filtered=$(lightning   filter       -project ${project} -priority ${priority} -i ${unfiltered} -min-coverage "0.9" -max-variants "30")
 numpy=$(lightning      export-numpy -project ${project} -priority ${priority} -i ${filtered})
 pca=$(lightning        pca          -project ${project} -priority ${priority} -i ${numpy})
