@@ -257,7 +257,7 @@ func (runner *arvadosContainerRunner) Run() (string, error) {
 			return
 		}
 		if lastState != cr.State {
-			log.Printf("container state: %s", cr.State)
+			log.Printf("container request state: %s", cr.State)
 			lastState = cr.State
 		}
 		if subscribedUUID != cr.ContainerUUID {
@@ -291,8 +291,9 @@ func (runner *arvadosContainerRunner) Run() (string, error) {
 	err = runner.Client.RequestAndDecode(&c, "GET", "arvados/v1/containers/"+cr.ContainerUUID, nil, nil)
 	if err != nil {
 		return "", err
-	}
-	if c.ExitCode != 0 {
+	} else if c.State != arvados.ContainerStateComplete {
+		return "", fmt.Errorf("container did not complete: %s", c.State)
+	} else if c.ExitCode != 0 {
 		return "", fmt.Errorf("container exited %d", c.ExitCode)
 	}
 	return cr.OutputUUID, err
