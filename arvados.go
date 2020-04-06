@@ -184,9 +184,8 @@ func (runner *arvadosContainerRunner) Run() (string, error) {
 
 	mounts := map[string]map[string]interface{}{
 		"/mnt/output": {
-			"kind":     "tmp",
+			"kind":     "collection",
 			"writable": true,
-			"capacity": 100000000000,
 		},
 	}
 	for path, mnt := range runner.Mounts {
