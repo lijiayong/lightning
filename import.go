@@ -101,7 +101,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 			err = errors.New("cannot specify output file in container mode: not implemented")
 			return 1
 		}
-		runner.Args = append([]string{"import", "-local=true", "-tag-library", cmd.tagLibraryFile, "-ref", cmd.refFile, "-o", cmd.outputFile}, inputs...)
+		runner.Args = append([]string{"import", "-local=true", fmt.Sprintf("-skip-ooo=%v", cmd.skipOOO), "-tag-library", cmd.tagLibraryFile, "-ref", cmd.refFile, "-o", cmd.outputFile}, inputs...)
 		var output string
 		output, err = runner.Run()
 		if err != nil {
