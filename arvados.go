@@ -126,20 +126,28 @@ reconnect:
 			time.Sleep(5 * time.Second)
 			continue reconnect
 		}
+		log.Printf("connected to websocket at %s", wsURL)
+
 		client.mtx.Lock()
 		client.wsconn = conn
+		resubscribe := make([]string, 0, len(client.notifying))
+		for uuid := range client.notifying {
+			resubscribe = append(resubscribe, uuid)
+		}
 		client.mtx.Unlock()
 
-		w := json.NewEncoder(conn)
-		for uuid := range client.notifying {
-			w.Encode(map[string]interface{}{
-				"method": "subscribe",
-				"filters": [][]interface{}{
-					{"object_uuid", "=", uuid},
-					{"event_type", "in", []string{"stderr", "crunch-run", "update"}},
-				},
-			})
-		}
+		go func() {
+			w := json.NewEncoder(conn)
+			for _, uuid := range resubscribe {
+				w.Encode(map[string]interface{}{
+					"method": "subscribe",
+					"filters": [][]interface{}{
+						{"object_uuid", "=", uuid},
+						{"event_type", "in", []string{"stderr", "crunch-run", "update"}},
+					},
+				})
+			}
+		}()
 
 		r := json.NewDecoder(conn)
 		for {
@@ -157,9 +165,11 @@ reconnect:
 					go conn.Close()
 					continue reconnect
 				}
+				client.mtx.Lock()
 				for ch := range client.notifying[msg.ObjectUUID] {
 					ch <- msg
 				}
+				client.mtx.Unlock()
 			}
 		}
 	}
