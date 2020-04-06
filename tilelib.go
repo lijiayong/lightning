@@ -39,6 +39,7 @@ func (tseq tileSeq) Variants() []tileVariantID {
 }
 
 type tileLibrary struct {
+	skipOOO bool
 	taglib  *tagLibrary
 	variant [][][blake2b.Size256]byte
 	// count [][]int
@@ -72,6 +73,12 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 		}
 		todo <- jobT{seqlabel, fasta}
 	}()
+	type foundtag struct {
+		pos    int
+		tagid  tagID
+		taglen int
+	}
+	found := make([]foundtag, 2000000)
 	path := make([]tileLibRef, 2000000)
 	totalPathLen := 0
 	skippedSequences := 0
@@ -83,19 +90,33 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 			continue
 		}
 		log.Debugf("%s %s tiling", filelabel, job.label)
-		path = path[:0]
-		tilestart := -1        // position in fasta of tile that ends here
-		tiletagid := tagID(-1) // tag id starting tile that ends here
-		tilelib.taglib.FindAll(job.fasta, func(id tagID, pos, taglen int) {
-			if tilestart >= 0 {
-				path = append(path, tilelib.getRef(tiletagid, job.fasta[tilestart:pos+taglen]))
-			}
-			tilestart = pos
-			tiletagid = id
+
+		found = found[:0]
+		tilelib.taglib.FindAll(job.fasta, func(tagid tagID, pos, taglen int) {
+			found = append(found, foundtag{pos: pos, tagid: tagid, taglen: taglen})
 		})
-		if tiletagid >= 0 {
-			path = append(path, tilelib.getRef(tiletagid, job.fasta[tilestart:]))
+		path = path[:0]
+		last := foundtag{tagid: -1}
+		for i, f := range found {
+			if tilelib.skipOOO {
+				if f.tagid < last.tagid+1 {
+					// e.g., last=B, this=A
+					continue
+				}
+				if f.tagid > last.tagid+1 && i+1 < len(found) && found[i+1].tagid <= f.tagid {
+					// e.g., last=A, this=C, next=B
+					continue
+				}
+			}
+			if last.taglen > 0 {
+				path = append(path, tilelib.getRef(last.tagid, job.fasta[last.pos:f.pos+f.taglen]))
+			}
+			last = f
 		}
+		if last.taglen > 0 {
+			path = append(path, tilelib.getRef(last.tagid, job.fasta[last.pos:]))
+		}
+
 		pathcopy := make([]tileLibRef, len(path))
 		copy(pathcopy, path)
 		ret[job.label] = pathcopy

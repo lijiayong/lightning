@@ -31,6 +31,7 @@ type importer struct {
 	outputFile     string
 	projectUUID    string
 	runLocal       bool
+	skipOOO        bool
 	encoder        *gob.Encoder
 }
 
@@ -48,6 +49,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 	flags.StringVar(&cmd.outputFile, "o", "-", "output `file`")
 	flags.StringVar(&cmd.projectUUID, "project", "", "project `UUID` for output data")
 	flags.BoolVar(&cmd.runLocal, "local", false, "run on local host (default: run in an arvados container)")
+	flags.BoolVar(&cmd.skipOOO, "skip-ooo", false, "skip out-of-order tags")
 	priority := flags.Int("priority", 500, "container request priority")
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
 	err = flags.Parse(args)
@@ -193,7 +195,7 @@ func (cmd *importer) loadTileLibrary() (*tileLibrary, error) {
 		return nil, fmt.Errorf("cannot tile: tag library is empty")
 	}
 	log.Printf("tag library %s load done", cmd.tagLibraryFile)
-	return &tileLibrary{taglib: &taglib}, nil
+	return &tileLibrary{taglib: &taglib, skipOOO: cmd.skipOOO}, nil
 }
 
 func listInputFiles(paths []string) (files []string, err error) {
@@ -293,8 +295,11 @@ func (cmd *importer) tileInputs(tilelib *tileLibrary, infiles []string) error {
 			}
 			flat := make([]tileVariantID, ntags*2)
 			for i := 0; i < ntags; i++ {
-				flat[i*2] = variants[0][i]
-				flat[i*2+1] = variants[1][i]
+				for hap := 0; hap < 2; hap++ {
+					if i < len(variants[hap]) {
+						flat[i*2+hap] = variants[hap][i]
+					}
+				}
 			}
 			err := cmd.encoder.Encode(LibraryEntry{
 				CompactGenomes: []CompactGenome{{Name: infile, Variants: flat}},
