@@ -77,7 +77,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 			Name:        "lightning import",
 			Client:      arvados.NewClientFromEnv(),
 			ProjectUUID: cmd.projectUUID,
-			RAM:         30000000000,
+			RAM:         60000000000,
 			VCPUs:       16,
 			Priority:    *priority,
 		}
