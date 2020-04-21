@@ -119,6 +119,7 @@ reconnect:
 		wsURL := cluster.Services.Websocket.ExternalURL
 		wsURL.Scheme = strings.Replace(wsURL.Scheme, "http", "ws", 1)
 		wsURL.Path = "/websocket"
+		wsURLNoToken := wsURL.String()
 		wsURL.RawQuery = url.Values{"api_token": []string{client.AuthToken}}.Encode()
 		conn, err := websocket.Dial(wsURL.String(), "", cluster.Services.Controller.ExternalURL.String())
 		if err != nil {
@@ -126,7 +127,7 @@ reconnect:
 			time.Sleep(5 * time.Second)
 			continue reconnect
 		}
-		log.Printf("connected to websocket at %s", wsURL)
+		log.Printf("connected to websocket at %s", wsURLNoToken)
 
 		client.mtx.Lock()
 		client.wsconn = conn
