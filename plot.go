@@ -116,7 +116,10 @@ if sys.argv[2]:
         'PJL': 'blueviolet',
     }
     for fnm in sorted(labels.keys()):
-        colors.append(labelcolors[labels[fnm]])
+        if labels[fnm] in labelcolors:
+            colors.append(labelcolors[labels[fnm]])
+        else:
+            colors.append('black')
 
 from matplotlib.figure import Figure
 from matplotlib.patches import Polygon
