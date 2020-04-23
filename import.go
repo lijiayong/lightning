@@ -52,6 +52,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 	flags.BoolVar(&cmd.skipOOO, "skip-ooo", false, "skip out-of-order tags")
 	priority := flags.Int("priority", 500, "container request priority")
 	pprof := flags.String("pprof", "", "serve Go profile data at http://`[addr]:port`")
+	loglevel := flags.String("loglevel", "info", "logging threshold (trace, debug, info, warn, error, fatal, or panic)")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
 		err = nil
@@ -71,6 +72,12 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 			log.Println(http.ListenAndServe(*pprof, nil))
 		}()
 	}
+
+	lvl, err := log.ParseLevel(*loglevel)
+	if err != nil {
+		return 2
+	}
+	log.SetLevel(lvl)
 
 	if !cmd.runLocal {
 		runner := arvadosContainerRunner{
@@ -101,7 +108,7 @@ func (cmd *importer) RunCommand(prog string, args []string, stdin io.Reader, std
 			err = errors.New("cannot specify output file in container mode: not implemented")
 			return 1
 		}
-		runner.Args = append([]string{"import", "-local=true", fmt.Sprintf("-skip-ooo=%v", cmd.skipOOO), "-tag-library", cmd.tagLibraryFile, "-ref", cmd.refFile, "-o", cmd.outputFile}, inputs...)
+		runner.Args = append([]string{"import", "-local=true", "-loglevel=" + *loglevel, fmt.Sprintf("-skip-ooo=%v", cmd.skipOOO), "-tag-library", cmd.tagLibraryFile, "-ref", cmd.refFile, "-o", cmd.outputFile}, inputs...)
 		var output string
 		output, err = runner.Run()
 		if err != nil {
