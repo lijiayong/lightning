@@ -101,12 +101,13 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 			log.Tracef("%s %s found[%d] == %#v", filelabel, job.label, i, f)
 			if tilelib.skipOOO {
 				if f.tagid < last.tagid+1 {
-					// e.g., last=B, this=A
-					log.Debugf("%s %s skipped out-of-order tag %d (found at %d) because it follows tag %d (found at %d)", filelabel, job.label, f.tagid, f.pos, last.tagid, last.pos)
+					log.Debugf("%s %s skipped out-of-order tag %d (found at %d) because it appears after tag %d (found at %d)", filelabel, job.label, f.tagid, f.pos, last.tagid, last.pos)
 					continue
 				}
-				if f.tagid > last.tagid+1 && i+1 < len(found) && found[i+1].tagid <= f.tagid {
-					// e.g., last=A, this=C, next=B
+				if f.tagid > last.tagid+1 && // accepting this tag would mean skipping some tags
+					i+1 < len(found) && // there is a "next" found tag after this one
+					found[i+1].tagid > last.tagid && // next found tag is usable (we haven't already passed it in accepted sequence)
+					found[i+1].tagid <= f.tagid { // next found tag is expected before this one (so we can't use both)
 					log.Debugf("%s %s skipped out-of-order tag %d (found at %d) because it appears between tag %d (found at %d) and %d (found at %d)", filelabel, job.label, f.tagid, f.pos, last.tagid, last.pos, found[i+1].tagid, found[i+1].pos)
 					continue
 				}

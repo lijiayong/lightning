@@ -95,6 +95,22 @@ gactctagcagagtggccagccac
 	c.Assert(err, check.IsNil)
 	c.Check(tseq, check.DeepEquals, tileSeq{"test-seq": []tileLibRef{{0, 1}, {1, 1}, {2, 1}}})
 
+	// tags appear in seq: 0, 1, 3, 0, 4 -> skip second tag0
+	tilelib = &tileLibrary{taglib: &taglib, skipOOO: true}
+	tseq, err = tilelib.TileFasta("test-label", bytes.NewBufferString(`>test-seq
+ggagaactgtgctccgccttcaga
+cccccccccccccccccccc
+acacatgctagcgcgtcggggtgg
+ggggggggggggggggggggggg
+cctcccgagccgagccacccgtca
+ggggggggggggggggggggggg
+ggagaactgtgctccgccttcaga
+ggggggggggggggggggggggg
+gttattaataataacttatcatca
+`))
+	c.Assert(err, check.IsNil)
+	c.Check(tseq, check.DeepEquals, tileSeq{"test-seq": []tileLibRef{{0, 1}, {1, 1}, {3, 1}, {4, 1}}})
+
 	// tags appear in seq: 0, 1, 3 -> don't skip
 	tilelib = &tileLibrary{taglib: &taglib, skipOOO: true}
 	tseq, err = tilelib.TileFasta("test-label", bytes.NewBufferString(`>test-seq
