@@ -80,6 +80,7 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 	}
 	found := make([]foundtag, 2000000)
 	path := make([]tileLibRef, 2000000)
+	totalFoundTags := 0
 	totalPathLen := 0
 	skippedSequences := 0
 	for job := range todo {
@@ -95,6 +96,8 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 		tilelib.taglib.FindAll(job.fasta, func(tagid tagID, pos, taglen int) {
 			found = append(found, foundtag{pos: pos, tagid: tagid, taglen: taglen})
 		})
+		totalFoundTags += len(found)
+
 		path = path[:0]
 		last := foundtag{tagid: -1}
 		for i, f := range found {
@@ -124,10 +127,10 @@ func (tilelib *tileLibrary) TileFasta(filelabel string, rdr io.Reader) (tileSeq,
 		pathcopy := make([]tileLibRef, len(path))
 		copy(pathcopy, path)
 		ret[job.label] = pathcopy
-		log.Debugf("%s %s tiled with path len %d", filelabel, job.label, len(path))
+		log.Debugf("%s %s tiled with path len %d, skipped %d", filelabel, job.label, len(path), len(found)-len(path))
 		totalPathLen += len(path)
 	}
-	log.Printf("%s tiled with total path len %d in %d sequences (skipped %d sequences with '_' in name)", filelabel, totalPathLen, len(ret), skippedSequences)
+	log.Printf("%s tiled with total path len %d in %d sequences (skipped %d sequences with '_' in name, skipped %d out-of-order tags)", filelabel, totalPathLen, len(ret), skippedSequences, totalFoundTags-totalPathLen)
 	return ret, scanner.Err()
 }
 
