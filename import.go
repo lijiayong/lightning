@@ -264,7 +264,9 @@ func (cmd *importer) tileInputs(tilelib *tileLibrary, infiles []string) error {
 				log.Printf("%s starting", infile)
 				defer log.Printf("%s done", infile)
 				tseqs, err := cmd.tileFasta(tilelib, infile)
-				variants[0] = tseqs.Variants()
+				var kept, dropped int
+				variants[0], kept, dropped = tseqs.Variants()
+				log.Printf("%s found %d unique tags plus %d repeats", infile, kept, dropped)
 				return err
 			}
 			infile2 := regexp.MustCompile(`\.1\.fasta(\.gz)?$`).ReplaceAllString(infile, `.2.fasta$1`)
@@ -273,7 +275,9 @@ func (cmd *importer) tileInputs(tilelib *tileLibrary, infiles []string) error {
 				log.Printf("%s starting", infile2)
 				defer log.Printf("%s done", infile2)
 				tseqs, err := cmd.tileFasta(tilelib, infile2)
-				variants[1] = tseqs.Variants()
+				var kept, dropped int
+				variants[1], kept, dropped = tseqs.Variants()
+				log.Printf("%s found %d unique tags plus %d repeats", infile, kept, dropped)
 				return err
 			}
 		} else {
@@ -284,7 +288,9 @@ func (cmd *importer) tileInputs(tilelib *tileLibrary, infiles []string) error {
 					log.Printf("%s phase %d starting", infile, phase+1)
 					defer log.Printf("%s phase %d done", infile, phase+1)
 					tseqs, err := cmd.tileGVCF(tilelib, infile, phase)
-					variants[phase] = tseqs.Variants()
+					var kept, dropped int
+					variants[phase], kept, dropped = tseqs.Variants()
+					log.Printf("%s phase %d found %d unique tags plus %d repeats", infile, phase+1, kept, dropped)
 					return err
 				}
 			}

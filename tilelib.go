@@ -20,7 +20,7 @@ type tileLibRef struct {
 
 type tileSeq map[string][]tileLibRef
 
-func (tseq tileSeq) Variants() []tileVariantID {
+func (tseq tileSeq) Variants() ([]tileVariantID, int, int) {
 	maxtag := 0
 	for _, refs := range tseq {
 		for _, ref := range refs {
@@ -30,12 +30,18 @@ func (tseq tileSeq) Variants() []tileVariantID {
 		}
 	}
 	vars := make([]tileVariantID, maxtag+1)
+	var kept, dropped int
 	for _, refs := range tseq {
 		for _, ref := range refs {
+			if vars[int(ref.tag)] != 0 {
+				dropped++
+			} else {
+				kept++
+			}
 			vars[int(ref.tag)] = ref.variant
 		}
 	}
-	return vars
+	return vars, kept, dropped
 }
 
 type tileLibrary struct {
