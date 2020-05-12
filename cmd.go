@@ -24,6 +24,7 @@ var (
 		"build-docker-image": &buildDockerImage{},
 		"pca":                &pythonPCA{},
 		"plot":               &pythonPlot{},
+		"diff-fasta":         &diffFasta{},
 	})
 )
 
