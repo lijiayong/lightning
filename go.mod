@@ -1,4 +1,4 @@
-module github.com/curii/lightning
+module git.arvados.org/lightning.git
 
 go 1.13
 

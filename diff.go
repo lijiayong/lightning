@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/curii/lightning/hgvs"
+	"git.arvados.org/lightning.git/hgvs"
 )
 
 type diffFasta struct{}
