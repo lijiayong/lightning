@@ -1,4 +1,4 @@
-module git.arvados.org/lightning.git
+module git.arvados.org/lightning
 
 go 1.13
 
