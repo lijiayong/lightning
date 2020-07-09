@@ -30,9 +30,13 @@ func (v *Variant) String() string {
 	}
 }
 
-func Diff(a, b string) []Variant {
+func Diff(a, b string, timeout time.Duration) []Variant {
 	dmp := diffmatchpatch.New()
-	diffs := cleanup(dmp.DiffCleanupEfficiency(dmp.DiffBisect(a, b, time.Time{})))
+	var deadline time.Time
+	if timeout > 0 {
+		deadline = time.Now().Add(timeout)
+	}
+	diffs := cleanup(dmp.DiffCleanupEfficiency(dmp.DiffBisect(a, b, deadline)))
 	pos := 1
 	var variants []Variant
 	for i := 0; i < len(diffs); i++ {

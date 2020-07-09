@@ -24,6 +24,7 @@ func (cmd *diffFasta) RunCommand(prog string, args []string, stdin io.Reader, st
 	flags.SetOutput(stderr)
 	offset := flags.Int("offset", 0, "coordinate offset")
 	sequence := flags.String("sequence", "chr1", "sequence label")
+	timeout := flags.Duration("timeout", 0, "timeout (examples: \"1s\", \"1ms\")")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
 		err = nil
@@ -63,7 +64,7 @@ func (cmd *diffFasta) RunCommand(prog string, args []string, stdin io.Reader, st
 		}
 	}
 
-	variants := hgvs.Diff(string(fasta[0]), string(fasta[1]))
+	variants := hgvs.Diff(string(fasta[0]), string(fasta[1]), *timeout)
 	if *offset != 0 {
 		for i := range variants {
 			variants[i].Position += *offset
