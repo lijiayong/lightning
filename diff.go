@@ -64,14 +64,14 @@ func (cmd *diffFasta) RunCommand(prog string, args []string, stdin io.Reader, st
 		}
 	}
 
-	variants := hgvs.Diff(string(fasta[0]), string(fasta[1]), *timeout)
+	variants, timedOut := hgvs.Diff(string(fasta[0]), string(fasta[1]), *timeout)
 	if *offset != 0 {
 		for i := range variants {
 			variants[i].Position += *offset
 		}
 	}
 	for _, v := range variants {
-		fmt.Fprintf(stdout, "%s:g.%s\t%s\t%d\t%s\t%s\n", *sequence, v.String(), *sequence, v.Position, v.Ref, v.New)
+		fmt.Fprintf(stdout, "%s:g.%s\t%s\t%d\t%s\t%s\t%v\n", *sequence, v.String(), *sequence, v.Position, v.Ref, v.New, timedOut)
 	}
 	return 0
 }

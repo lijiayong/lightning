@@ -61,7 +61,8 @@ func (s *diffSuite) TestDiff(c *check.C) {
 	} {
 		c.Log(trial)
 		var vars []string
-		for _, v := range Diff(trial.a, trial.b, 0) {
+		diffs, _ := Diff(trial.a, trial.b, 0)
+		for _, v := range diffs {
 			vars = append(vars, v.String())
 		}
 		c.Check(vars, check.DeepEquals, trial.expect)

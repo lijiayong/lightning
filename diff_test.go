@@ -26,8 +26,8 @@ func (s *diffSuite) TestDiff(c *check.C) {
 	exited := (&diffFasta{}).RunCommand("diff-fasta", []string{"-sequence", "chr2", "-offset", "1000", tempdir + "/f1.fa", tempdir + "/f2.fa"}, nil, &output, os.Stderr)
 	c.Check(exited, check.Equals, 0)
 	c.Check("\n"+output.String(), check.Equals, `
-chr2:g.1008C>G	chr2	1008	C	G
-chr2:g.1028_1029delinsTT	chr2	1028	AA	TT
-chr2:g.1032_1033insA	chr2	1033		A
+chr2:g.1008C>G	chr2	1008	C	G	false
+chr2:g.1028_1029delinsTT	chr2	1028	AA	TT	false
+chr2:g.1032_1033insA	chr2	1033		A	false
 `)
 }
