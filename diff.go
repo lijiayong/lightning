@@ -49,6 +49,7 @@ func (cmd *diffFasta) RunCommand(prog string, args []string, stdin io.Reader, st
 			}
 			defer f.Close()
 			scanner := bufio.NewScanner(f)
+			scanner.Buffer(nil, 64*1024*1024)
 			for scanner.Scan() {
 				buf := scanner.Bytes()
 				if len(buf) > 0 && buf[0] != '>' {
