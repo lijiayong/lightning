@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/arvados/lightning/hgvs"
 )
@@ -23,7 +24,6 @@ func (cmd *diffFasta) RunCommand(prog string, args []string, stdin io.Reader, st
 	flags := flag.NewFlagSet("", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	offset := flags.Int("offset", 0, "coordinate offset")
-	sequence := flags.String("sequence", "chr1", "sequence label")
 	timeout := flags.Duration("timeout", 0, "timeout (examples: \"1s\", \"1ms\")")
 	err = flags.Parse(args)
 	if err == flag.ErrHelp {
@@ -65,14 +65,41 @@ func (cmd *diffFasta) RunCommand(prog string, args []string, stdin io.Reader, st
 		}
 	}
 
-	variants, timedOut := hgvs.Diff(string(fasta[0]), string(fasta[1]), *timeout)
+	afasta := string(fasta[0])
+	bfasta := string(fasta[1])
+	variants, timedOut := hgvs.Diff(afasta, bfasta, *timeout)
 	if *offset != 0 {
 		for i := range variants {
 			variants[i].Position += *offset
 		}
 	}
-	for _, v := range variants {
-		fmt.Fprintf(stdout, "%s:g.%s\t%s\t%d\t%s\t%s\t%v\n", *sequence, v.String(), *sequence, v.Position, v.Ref, v.New, timedOut)
+	switch len(variants) {
+	case 0:
+		fmt.Fprintf(stdout, "=,\n")
+	default:
+		var hgvsannos, vcfs []string
+		var vcfPosition int
+		var vcfRef, vcfNew string
+		for _, v := range variants {
+			hgvsannos = append(hgvsannos, v.String())
+			orginalPosition := v.Position - *offset
+			if (len(v.Ref) == 0 || len(v.New) == 0) && orginalPosition > 1 {
+				vcfPosition = orginalPosition - 1
+				vcfRef = fmt.Sprintf("%s%s", string(afasta[vcfPosition-1]), v.Ref)
+				vcfNew = fmt.Sprintf("%s%s", string(afasta[vcfPosition-1]), v.New)
+			} else {
+				vcfPosition, vcfRef, vcfNew = v.Position, v.Ref, v.New
+			}
+			vcfs = append(vcfs, fmt.Sprintf("%d|%s|%s", vcfPosition, vcfRef, vcfNew))
+		}
+		hgvsanno := strings.Join(hgvsannos, ";")
+		vcf := strings.Join(vcfs, ";")
+		switch len(variants) {
+		case 1:
+			fmt.Fprintf(stdout, "%s,%s,%v\n", hgvsanno, vcf, timedOut)
+		default:
+			fmt.Fprintf(stdout, "[%s],%s,%v\n", hgvsanno, vcf, timedOut)
+		}
 	}
 	return 0
 }
