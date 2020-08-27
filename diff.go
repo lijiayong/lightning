@@ -82,9 +82,8 @@ func (cmd *diffFasta) RunCommand(prog string, args []string, stdin io.Reader, st
 		var vcfRef, vcfNew string
 		for _, v := range variants {
 			hgvsannos = append(hgvsannos, v.String())
-			orginalPosition := v.Position - *offset
-			if (len(v.Ref) == 0 || len(v.New) == 0) && orginalPosition > 1 {
-				vcfPosition = orginalPosition - 1
+			if (len(v.Ref) == 0 || len(v.New) == 0) && (v.Position - *offset > 1) {
+				vcfPosition = v.Position - 1
 				vcfRef = fmt.Sprintf("%s%s", string(afasta[vcfPosition-1]), v.Ref)
 				vcfNew = fmt.Sprintf("%s%s", string(afasta[vcfPosition-1]), v.New)
 			} else {
