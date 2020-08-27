@@ -96,9 +96,14 @@ func (cmd *diffFasta) RunCommand(prog string, args []string, stdin io.Reader, st
 		vcf := strings.Join(vcfs, ";")
 		switch len(variants) {
 		case 1:
-			fmt.Fprintf(stdout, "%s,%s,%v\n", hgvsanno, vcf, timedOut)
+			fmt.Fprintf(stdout, "%s,%s", hgvsanno, vcf)
 		default:
-			fmt.Fprintf(stdout, "[%s],%s,%v\n", hgvsanno, vcf, timedOut)
+			fmt.Fprintf(stdout, "[%s],%s", hgvsanno, vcf)
+		}
+		if timedOut {
+			fmt.Fprintf(stdout, ",timedOut\n")
+		} else {
+			fmt.Fprintf(stdout, "\n")
 		}
 	}
 	return 0
