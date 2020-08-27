@@ -75,7 +75,7 @@ func (cmd *diffFasta) RunCommand(prog string, args []string, stdin io.Reader, st
 	}
 	switch len(variants) {
 	case 0:
-		fmt.Fprintf(stdout, "=,\n")
+		fmt.Fprintf(stdout, "=,")
 	default:
 		var hgvsannos, vcfs []string
 		var vcfPosition int
@@ -100,11 +100,11 @@ func (cmd *diffFasta) RunCommand(prog string, args []string, stdin io.Reader, st
 		default:
 			fmt.Fprintf(stdout, "[%s],%s", hgvsanno, vcf)
 		}
-		if timedOut {
-			fmt.Fprintf(stdout, ",timedOut\n")
-		} else {
-			fmt.Fprintf(stdout, "\n")
-		}
+	}
+	if timedOut {
+		fmt.Fprintf(stdout, ",timedOut\n")
+	} else {
+		fmt.Fprintf(stdout, "\n")
 	}
 	return 0
 }
